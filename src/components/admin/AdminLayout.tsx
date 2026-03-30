@@ -1,9 +1,9 @@
-import { Outlet, Link, useLocation, useNavigate } from 'react-router-dom';
+import { Outlet, Link, useLocation, useNavigate, Navigate } from 'react-router-dom';
 import {
   LayoutDashboard, Calendar, Scissors, Users, ClipboardList, LogOut, Menu, X,
 } from 'lucide-react';
 import { useState } from 'react';
-import { Button } from '@/components/ui/button';
+import { useAuth } from '@/contexts/AuthContext';
 
 const links = [
   { to: '/admin', label: 'Dashboard', icon: LayoutDashboard },
@@ -16,10 +16,15 @@ const links = [
 export function AdminLayout() {
   const location = useLocation();
   const navigate = useNavigate();
+  const { isAuthenticated, employee, logout } = useAuth();
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
+  if (!isAuthenticated) {
+    return <Navigate to="/admin/login" replace />;
+  }
+
   const handleLogout = () => {
-    localStorage.removeItem('majli_admin');
+    logout();
     navigate('/admin/login');
   };
 
@@ -60,6 +65,10 @@ export function AdminLayout() {
         </nav>
 
         <div className="absolute bottom-0 left-0 right-0 p-3 border-t border-border">
+          <div className="px-4 py-2 mb-2">
+            <p className="text-xs text-muted-foreground">Zalogowano jako</p>
+            <p className="text-sm font-medium text-foreground truncate">{employee?.name}</p>
+          </div>
           <button
             onClick={handleLogout}
             className="flex items-center gap-3 px-4 py-2.5 rounded-lg text-sm font-medium text-muted-foreground hover:bg-secondary hover:text-foreground w-full transition-colors"

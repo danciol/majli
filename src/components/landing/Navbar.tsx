@@ -10,7 +10,11 @@ const navLinks = [
   { label: 'Kontakt', href: '#kontakt' },
 ];
 
-export function Navbar() {
+interface NavbarProps {
+  onBooking?: () => void;
+}
+
+export function Navbar({ onBooking }: NavbarProps) {
   const [mobileOpen, setMobileOpen] = useState(false);
 
   const scrollTo = (href: string) => {
@@ -38,7 +42,7 @@ export function Navbar() {
             </button>
           ))}
           <Button
-            onClick={() => scrollTo('#uslugi')}
+            onClick={onBooking}
             className="bg-primary text-primary-foreground hover:bg-primary/90 font-semibold"
           >
             Umów wizytę
@@ -68,7 +72,7 @@ export function Navbar() {
             </button>
           ))}
           <Button
-            onClick={() => scrollTo('#uslugi')}
+            onClick={() => { setMobileOpen(false); onBooking?.(); }}
             className="w-full bg-primary text-primary-foreground"
           >
             Umów wizytę

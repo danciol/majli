@@ -4,7 +4,11 @@ import { Clock, ChevronRight } from 'lucide-react';
 import { categories, mockServices } from '@/data/services';
 import { Button } from '@/components/ui/button';
 
-export function ServicesSection() {
+interface Props {
+  onBookService?: (serviceId: string) => void;
+}
+
+export function ServicesSection({ onBookService }: Props) {
   const [activeCategory, setActiveCategory] = useState('manicure');
 
   const filtered = mockServices.filter(s => s.category === activeCategory && s.active);
@@ -75,6 +79,7 @@ export function ServicesSection() {
                     variant="ghost"
                     size="sm"
                     className="text-primary hover:text-primary/80 hover:bg-primary/5 text-xs p-0 h-auto font-semibold"
+                    onClick={() => onBookService?.(service.id)}
                   >
                     Umów się <ChevronRight size={14} />
                   </Button>

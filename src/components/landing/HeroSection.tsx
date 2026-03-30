@@ -2,10 +2,11 @@ import { motion } from 'framer-motion';
 import { Button } from '@/components/ui/button';
 import heroImage from '@/assets/hero-salon.jpg';
 
-export function HeroSection() {
-  const scrollToServices = () => {
-    document.querySelector('#uslugi')?.scrollIntoView({ behavior: 'smooth' });
-  };
+interface HeroProps {
+  onBooking?: () => void;
+}
+
+export function HeroSection({ onBooking }: HeroProps) {
 
   return (
     <section className="relative min-h-screen flex items-center justify-center overflow-hidden">
@@ -49,7 +50,7 @@ export function HeroSection() {
           <div className="flex flex-col sm:flex-row gap-4">
             <Button
               size="lg"
-              onClick={scrollToServices}
+              onClick={onBooking}
               className="bg-primary text-primary-foreground hover:bg-primary/90 text-base px-8 py-6 font-semibold"
             >
               Umów wizytę
