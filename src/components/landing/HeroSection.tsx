@@ -50,7 +50,7 @@ export function HeroSection({ onBooking }: HeroProps) {
           <div className="flex flex-col sm:flex-row gap-4">
             <Button
               size="lg"
-              onClick={scrollToServices}
+              onClick={onBooking}
               className="bg-primary text-primary-foreground hover:bg-primary/90 text-base px-8 py-6 font-semibold"
             >
               Umów wizytę
