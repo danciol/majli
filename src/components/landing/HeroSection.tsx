@@ -2,10 +2,11 @@ import { motion } from 'framer-motion';
 import { Button } from '@/components/ui/button';
 import heroImage from '@/assets/hero-salon.jpg';
 
-export function HeroSection() {
-  const scrollToServices = () => {
-    document.querySelector('#uslugi')?.scrollIntoView({ behavior: 'smooth' });
-  };
+interface HeroProps {
+  onBooking?: () => void;
+}
+
+export function HeroSection({ onBooking }: HeroProps) {
 
   return (
     <section className="relative min-h-screen flex items-center justify-center overflow-hidden">
