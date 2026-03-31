@@ -19,9 +19,8 @@ export function AdminLayout() {
   const { isAuthenticated, user, logout, loading } = useAuth();
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
-  if (!isAuthenticated) {
-    return <Navigate to="/admin/login" replace />;
-  }
+  if (loading) return <div className="min-h-screen flex items-center justify-center"><span className="text-muted-foreground">Ładowanie...</span></div>;
+  if (!isAuthenticated) return <Navigate to="/admin/login" replace />;
 
   const handleLogout = () => {
     logout();
