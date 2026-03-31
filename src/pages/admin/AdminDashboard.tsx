@@ -1,9 +1,11 @@
-import { useMemo } from 'react';
-import { Calendar, Users, Scissors, Clock, TrendingUp } from 'lucide-react';
+import { useMemo, useState } from 'react';
+import { Calendar, Users, Scissors, Clock, TrendingUp, Loader2, Database } from 'lucide-react';
 import { useAppointments, useServices, useEmployees } from '@/hooks/useFirestore';
 import { format } from 'date-fns';
 import { pl } from 'date-fns/locale';
-import { Loader2 } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { seedFirestore } from '@/lib/seedFirestore';
+import { toast } from 'sonner';
 
 const statusLabels: Record<string, string> = {
   pending: 'Oczekuje',
