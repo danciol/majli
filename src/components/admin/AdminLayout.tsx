@@ -66,7 +66,7 @@ export function AdminLayout() {
         <div className="absolute bottom-0 left-0 right-0 p-3 border-t border-border">
           <div className="px-4 py-2 mb-2">
             <p className="text-xs text-muted-foreground">Zalogowano jako</p>
-            <p className="text-sm font-medium text-foreground truncate">{employee?.name}</p>
+            <p className="text-sm font-medium text-foreground truncate">{user?.email}</p>
           </div>
           <button
             onClick={handleLogout}
