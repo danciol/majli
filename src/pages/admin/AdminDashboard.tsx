@@ -25,6 +25,7 @@ const AdminDashboard = () => {
   const { appointments, loading: loadingA } = useAppointments();
   const { services, loading: loadingS } = useServices();
   const { employees, loading: loadingE } = useEmployees();
+  const [seeding, setSeeding] = useState(false);
 
   const loading = loadingA || loadingS || loadingE;
   const today = new Date();
