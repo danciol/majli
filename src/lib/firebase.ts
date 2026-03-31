@@ -3,7 +3,7 @@ import { getAuth } from 'firebase/auth';
 import { getFirestore } from 'firebase/firestore';
 
 const firebaseConfig = {
-  apiKey: 'AIzaSyAYaWfzN68_XQLCgXuD7HmWh4ecp',
+  apiKey: 'AIzaSyAYaWfzN68_XQLCgXuD7HmWh4ecpGYYukc',
   authDomain: 'salon-beauty-de32a.firebaseapp.com',
   projectId: 'salon-beauty-de32a',
   storageBucket: 'salon-beauty-de32a.firebasestorage.app',
