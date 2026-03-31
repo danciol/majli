@@ -1,7 +1,7 @@
 import { useState } from 'react';
-import { mockEmployees, categories } from '@/data/services';
 import type { Employee } from '@/data/services';
-import { Plus, Edit2, Trash2, User } from 'lucide-react';
+import { useEmployees } from '@/hooks/useFirestore';
+import { Plus, Edit2, Trash2, User, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -11,7 +11,7 @@ import {
 import { toast } from 'sonner';
 
 const AdminEmployees = () => {
-  const [employees, setEmployees] = useState<Employee[]>(mockEmployees);
+  const { employees, loading, addEmployee, updateEmployee, deleteEmployee } = useEmployees();
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editing, setEditing] = useState<Employee | null>(null);
   const [form, setForm] = useState({ name: '' });
@@ -28,37 +28,46 @@ const AdminEmployees = () => {
     setDialogOpen(true);
   };
 
-  const handleSave = () => {
+  const handleSave = async () => {
     if (!form.name) { toast.error('Wprowadź imię'); return; }
-    if (editing) {
-      setEmployees(prev => prev.map(e => e.id === editing.id ? { ...e, name: form.name } : e));
-      toast.success('Pracownik zaktualizowany');
-    } else {
-      const newEmp: Employee = {
-        id: String(Date.now()), name: form.name, photo: '', services: [],
-        workingHours: {
-          mon: { start: '09:00', end: '17:00' },
-          tue: { start: '09:00', end: '17:00' },
-          wed: { start: '09:00', end: '17:00' },
-          thu: { start: '09:00', end: '17:00' },
-          fri: { start: '09:00', end: '17:00' },
-        },
-        daysOff: [],
-      };
-      setEmployees(prev => [...prev, newEmp]);
-      toast.success('Pracownik dodany');
+    try {
+      if (editing) {
+        await updateEmployee(editing.id, { name: form.name });
+        toast.success('Pracownik zaktualizowany');
+      } else {
+        await addEmployee({
+          name: form.name, photo: '', services: [],
+          workingHours: {
+            mon: { start: '09:00', end: '17:00' },
+            tue: { start: '09:00', end: '17:00' },
+            wed: { start: '09:00', end: '17:00' },
+            thu: { start: '09:00', end: '17:00' },
+            fri: { start: '09:00', end: '17:00' },
+          },
+          daysOff: [],
+        });
+        toast.success('Pracownik dodany');
+      }
+      setDialogOpen(false);
+    } catch {
+      toast.error('Błąd zapisu');
     }
-    setDialogOpen(false);
   };
 
-  const handleDelete = (id: string) => {
-    setEmployees(prev => prev.filter(e => e.id !== id));
-    toast.success('Pracownik usunięty');
+  const handleDelete = async (id: string) => {
+    try {
+      await deleteEmployee(id);
+      toast.success('Pracownik usunięty');
+    } catch {
+      toast.error('Błąd usuwania');
+    }
   };
 
   const dayLabels: Record<string, string> = {
     mon: 'Pon', tue: 'Wt', wed: 'Śr', thu: 'Czw', fri: 'Pt', sat: 'Sob', sun: 'Nd',
   };
+
+  if (loading) return <div className="flex items-center justify-center py-20"><Loader2 className="w-6 h-6 animate-spin text-primary" /></div>;
 
   return (
     <div className="space-y-6">
@@ -106,6 +115,10 @@ const AdminEmployees = () => {
           </div>
         ))}
       </div>
+
+      {employees.length === 0 && (
+        <p className="text-center text-muted-foreground py-12">Brak pracowników. Dodaj pierwszego pracownika.</p>
+      )}
 
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
         <DialogContent>

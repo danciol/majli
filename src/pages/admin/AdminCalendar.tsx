@@ -1,9 +1,10 @@
 import { useState, useRef } from 'react';
 import { format, addDays, startOfWeek, isSameDay } from 'date-fns';
 import { pl } from 'date-fns/locale';
-import { ChevronLeft, ChevronRight, Upload, FileUp, CheckCircle2, Plus } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Upload, FileUp, CheckCircle2, Plus, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { mockAppointments, mockServices, mockEmployees, Appointment } from '@/data/services';
+import { Appointment } from '@/data/services';
+import { useAppointments, useServices, useEmployees } from '@/hooks/useFirestore';
 import { parseICSFile } from '@/lib/icsParser';
 import { toast } from 'sonner';
 import {
@@ -11,7 +12,7 @@ import {
 } from '@/components/ui/dialog';
 import AppointmentDialog from '@/components/admin/AppointmentDialog';
 
-const hours = Array.from({ length: 13 }, (_, i) => i + 8); // 8:00–20:00
+const hours = Array.from({ length: 13 }, (_, i) => i + 8);
 
 const statusColors: Record<string, string> = {
   pending: 'bg-accent/20 border-accent text-accent-foreground',
@@ -22,20 +23,21 @@ const statusColors: Record<string, string> = {
 
 const AdminCalendar = () => {
   const [currentDate, setCurrentDate] = useState(new Date());
-  const [allAppointments, setAllAppointments] = useState<Appointment[]>(mockAppointments);
+  const { appointments, loading: loadingA, addAppointment, updateAppointment, deleteAppointment } = useAppointments();
+  const { services, loading: loadingS } = useServices();
+  const { employees, loading: loadingE } = useEmployees();
   const [showImportDialog, setShowImportDialog] = useState(false);
   const [pendingImport, setPendingImport] = useState<Partial<Appointment>[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Appointment dialog state
   const [apptDialogOpen, setApptDialogOpen] = useState(false);
   const [editingAppointment, setEditingAppointment] = useState<Appointment | null>(null);
   const [newApptDate, setNewApptDate] = useState<Date | null>(null);
 
+  const loading = loadingA || loadingS || loadingE;
   const weekStart = startOfWeek(currentDate, { weekStartsOn: 1 });
   const weekDays = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i));
 
-  // ICS import
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -44,7 +46,7 @@ const AdminCalendar = () => {
       const text = await file.text();
       const events = parseICSFile(text);
       if (events.length === 0) { toast.error('Nie znaleziono wydarzeń w pliku'); return; }
-      const existingUIDs = new Set(allAppointments.map(a => a.googleCalendarEventId).filter(Boolean));
+      const existingUIDs = new Set(appointments.map(a => a.googleCalendarEventId).filter(Boolean));
       const newEvents = events.filter(e => !e.googleCalendarEventId || !existingUIDs.has(e.googleCalendarEventId));
       if (newEvents.length === 0) { toast.info('Wszystkie wydarzenia już istnieją'); return; }
       setPendingImport(newEvents);
@@ -53,22 +55,25 @@ const AdminCalendar = () => {
     if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
-  const confirmImport = () => {
-    const newAppts = pendingImport.map(p => ({
-      ...p,
-      serviceId: p.serviceId || '', employeeId: p.employeeId || '',
-      clientName: p.clientName || 'Wydarzenie', clientPhone: p.clientPhone || '',
-      clientEmail: p.clientEmail || '', date: p.date || new Date().toISOString(),
-      duration: p.duration || 60, status: p.status || 'confirmed',
-      id: p.id || '', createdAt: p.createdAt || new Date().toISOString(),
-    })) as Appointment[];
-    setAllAppointments(prev => [...prev, ...newAppts]);
-    setPendingImport([]);
-    setShowImportDialog(false);
-    toast.success(`Zaimportowano ${newAppts.length} wydarzeń`);
+  const confirmImport = async () => {
+    try {
+      for (const p of pendingImport) {
+        await addAppointment({
+          serviceId: p.serviceId || '', employeeId: p.employeeId || '',
+          clientName: p.clientName || 'Wydarzenie', clientPhone: p.clientPhone || '',
+          clientEmail: p.clientEmail || '', date: p.date || new Date().toISOString(),
+          duration: p.duration || 60, status: (p.status as Appointment['status']) || 'confirmed',
+          googleCalendarEventId: p.googleCalendarEventId,
+          notes: p.notes,
+          createdAt: p.createdAt || new Date().toISOString(),
+        });
+      }
+      setPendingImport([]);
+      setShowImportDialog(false);
+      toast.success(`Zaimportowano ${pendingImport.length} wydarzeń`);
+    } catch { toast.error('Błąd importu'); }
   };
 
-  // Click handlers
   const handleCellClick = (day: Date, hour: number) => {
     const clickDate = new Date(day);
     clickDate.setHours(hour, 0, 0, 0);
@@ -84,25 +89,33 @@ const AdminCalendar = () => {
     setApptDialogOpen(true);
   };
 
-  const handleSaveAppointment = (data: Appointment) => {
-    setAllAppointments(prev => {
-      const exists = prev.find(a => a.id === data.id);
-      if (exists) return prev.map(a => a.id === data.id ? data : a);
-      return [...prev, data];
-    });
-    toast.success(editingAppointment ? 'Wizyta zaktualizowana' : 'Wizyta dodana');
+  const handleSaveAppointment = async (data: Appointment) => {
+    try {
+      if (editingAppointment) {
+        const { id, ...rest } = data;
+        await updateAppointment(id, rest);
+        toast.success('Wizyta zaktualizowana');
+      } else {
+        const { id, ...rest } = data;
+        await addAppointment(rest);
+        toast.success('Wizyta dodana');
+      }
+    } catch { toast.error('Błąd zapisu'); }
   };
 
-  const handleDeleteAppointment = (id: string) => {
-    setAllAppointments(prev => prev.filter(a => a.id !== id));
-    toast.success('Wizyta usunięta');
+  const handleDeleteAppointment = async (id: string) => {
+    try {
+      await deleteAppointment(id);
+      toast.success('Wizyta usunięta');
+    } catch { toast.error('Błąd usuwania'); }
   };
 
   const goToToday = () => setCurrentDate(new Date());
 
+  if (loading) return <div className="flex items-center justify-center py-20"><Loader2 className="w-6 h-6 animate-spin text-primary" /></div>;
+
   return (
     <div className="space-y-4">
-      {/* Header */}
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div className="flex items-center gap-3">
           <h1 className="font-heading text-2xl font-bold">Kalendarz</h1>
@@ -127,10 +140,8 @@ const AdminCalendar = () => {
         </div>
       </div>
 
-      {/* Calendar grid */}
       <div className="bg-card rounded-xl border border-border shadow-sm overflow-auto">
         <div className="min-w-[800px]">
-          {/* Day headers */}
           <div className="grid grid-cols-[56px_repeat(7,1fr)] border-b border-border sticky top-0 bg-card z-10">
             <div className="p-2" />
             {weekDays.map((day) => {
@@ -150,14 +161,13 @@ const AdminCalendar = () => {
             })}
           </div>
 
-          {/* Time rows */}
           {hours.map((hour) => (
             <div key={hour} className="grid grid-cols-[56px_repeat(7,1fr)] border-b border-border/40">
               <div className="pr-2 pt-0 text-[11px] text-muted-foreground text-right -translate-y-2">
                 {hour}:00
               </div>
               {weekDays.map((day) => {
-                const dayAppts = allAppointments.filter((a) => {
+                const dayAppts = appointments.filter((a) => {
                   const aDate = new Date(a.date);
                   return isSameDay(aDate, day) && aDate.getHours() === hour;
                 });
@@ -168,16 +178,14 @@ const AdminCalendar = () => {
                     className="border-l border-border/40 min-h-[56px] relative group cursor-pointer hover:bg-secondary/30 transition-colors"
                     onClick={() => handleCellClick(day, hour)}
                   >
-                    {/* Add hint on hover */}
                     <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
                       <Plus className="w-4 h-4 text-muted-foreground/40" />
                     </div>
 
                     {dayAppts.map((a) => {
-                      const service = mockServices.find(s => s.id === a.serviceId);
-                      const employee = mockEmployees.find(e => e.id === a.employeeId);
+                      const service = services.find(s => s.id === a.serviceId);
+                      const employee = employees.find(e => e.id === a.employeeId);
                       const heightBlocks = Math.max(1, Math.ceil(a.duration / 60));
-                      const isImported = !a.serviceId;
                       const colorClass = statusColors[a.status] || statusColors.confirmed;
 
                       return (
@@ -208,17 +216,17 @@ const AdminCalendar = () => {
         </div>
       </div>
 
-      {/* Appointment edit/create dialog */}
       <AppointmentDialog
         open={apptDialogOpen}
         onOpenChange={setApptDialogOpen}
         appointment={editingAppointment}
         defaultDate={newApptDate}
+        services={services}
+        employees={employees}
         onSave={handleSaveAppointment}
         onDelete={handleDeleteAppointment}
       />
 
-      {/* ICS Import confirmation dialog */}
       <Dialog open={showImportDialog} onOpenChange={setShowImportDialog}>
         <DialogContent className="max-w-md">
           <DialogHeader>

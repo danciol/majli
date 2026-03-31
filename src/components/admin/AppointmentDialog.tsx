@@ -1,6 +1,5 @@
 import { useState, useEffect } from 'react';
 import { format } from 'date-fns';
-import { pl } from 'date-fns/locale';
 import { Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -12,19 +11,21 @@ import {
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle,
 } from '@/components/ui/dialog';
-import { mockServices, mockEmployees, Appointment } from '@/data/services';
+import { Appointment, Service, Employee } from '@/data/services';
 
 interface AppointmentDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   appointment?: Appointment | null;
   defaultDate?: Date | null;
+  services: Service[];
+  employees: Employee[];
   onSave: (data: Appointment) => void;
   onDelete?: (id: string) => void;
 }
 
 const AppointmentDialog = ({
-  open, onOpenChange, appointment, defaultDate, onSave, onDelete,
+  open, onOpenChange, appointment, defaultDate, services, employees, onSave, onDelete,
 }: AppointmentDialogProps) => {
   const isEdit = !!appointment;
 
@@ -68,7 +69,7 @@ const AppointmentDialog = ({
 
   const handleSave = () => {
     const dateTime = new Date(`${date}T${time}`);
-    const selectedService = mockServices.find(s => s.id === serviceId);
+    const selectedService = services.find(s => s.id === serviceId);
 
     onSave({
       id: appointment?.id || 'new-' + Date.now(),
@@ -88,8 +89,8 @@ const AppointmentDialog = ({
   };
 
   const availableEmployees = serviceId
-    ? mockEmployees.filter(e => e.services.includes(serviceId))
-    : mockEmployees;
+    ? employees.filter(e => e.services.includes(serviceId))
+    : employees;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -114,12 +115,12 @@ const AppointmentDialog = ({
             <Label>Usługa</Label>
             <Select value={serviceId} onValueChange={(v) => {
               setServiceId(v);
-              const svc = mockServices.find(s => s.id === v);
+              const svc = services.find(s => s.id === v);
               if (svc) setDuration(svc.duration);
             }}>
               <SelectTrigger><SelectValue placeholder="Wybierz usługę" /></SelectTrigger>
               <SelectContent>
-                {mockServices.filter(s => s.active).map(s => (
+                {services.filter(s => s.active).map(s => (
                   <SelectItem key={s.id} value={s.id}>
                     {s.name} ({s.duration} min · {s.price} zł)
                   </SelectItem>

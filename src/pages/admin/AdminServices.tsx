@@ -1,12 +1,13 @@
 import { useState } from 'react';
-import { mockServices, categories } from '@/data/services';
+import { categories } from '@/data/services';
 import type { Service } from '@/data/services';
-import { Plus, Edit2, Trash2 } from 'lucide-react';
+import { useServices } from '@/hooks/useFirestore';
+import { Plus, Edit2, Trash2, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import {
-  Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger,
+  Dialog, DialogContent, DialogHeader, DialogTitle,
 } from '@/components/ui/dialog';
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
@@ -14,7 +15,7 @@ import {
 import { toast } from 'sonner';
 
 const AdminServices = () => {
-  const [services, setServices] = useState<Service[]>(mockServices);
+  const { services, loading, addService, updateService, deleteService } = useServices();
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editing, setEditing] = useState<Service | null>(null);
   const [form, setForm] = useState({ name: '', category: 'manicure', price: '', duration: '', description: '' });
@@ -31,33 +32,43 @@ const AdminServices = () => {
     setDialogOpen(true);
   };
 
-  const handleSave = () => {
+  const handleSave = async () => {
     if (!form.name || !form.price || !form.duration) {
       toast.error('Wypełnij wszystkie wymagane pola');
       return;
     }
-    if (editing) {
-      setServices(prev => prev.map(s => s.id === editing.id ? { ...s, ...form, price: Number(form.price), duration: Number(form.duration) } : s));
-      toast.success('Usługa zaktualizowana');
-    } else {
-      const newService: Service = {
-        id: String(Date.now()),
-        ...form,
-        price: Number(form.price),
-        duration: Number(form.duration),
-        employeeIds: [],
-        active: true,
-      };
-      setServices(prev => [...prev, newService]);
-      toast.success('Usługa dodana');
+    try {
+      if (editing) {
+        await updateService(editing.id, { name: form.name, category: form.category, price: Number(form.price), duration: Number(form.duration), description: form.description });
+        toast.success('Usługa zaktualizowana');
+      } else {
+        await addService({
+          name: form.name,
+          category: form.category,
+          price: Number(form.price),
+          duration: Number(form.duration),
+          description: form.description,
+          employeeIds: [],
+          active: true,
+        });
+        toast.success('Usługa dodana');
+      }
+      setDialogOpen(false);
+    } catch {
+      toast.error('Błąd zapisu');
     }
-    setDialogOpen(false);
   };
 
-  const handleDelete = (id: string) => {
-    setServices(prev => prev.filter(s => s.id !== id));
-    toast.success('Usługa usunięta');
+  const handleDelete = async (id: string) => {
+    try {
+      await deleteService(id);
+      toast.success('Usługa usunięta');
+    } catch {
+      toast.error('Błąd usuwania');
+    }
   };
+
+  if (loading) return <div className="flex items-center justify-center py-20"><Loader2 className="w-6 h-6 animate-spin text-primary" /></div>;
 
   return (
     <div className="space-y-6">
@@ -97,6 +108,10 @@ const AdminServices = () => {
           </div>
         );
       })}
+
+      {services.length === 0 && (
+        <p className="text-center text-muted-foreground py-12">Brak usług. Dodaj pierwszą usługę.</p>
+      )}
 
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
         <DialogContent>

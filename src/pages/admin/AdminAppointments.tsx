@@ -1,8 +1,9 @@
-import { mockAppointments, mockServices, mockEmployees } from '@/data/services';
+import { useAppointments, useServices, useEmployees } from '@/hooks/useFirestore';
 import { format } from 'date-fns';
 import { pl } from 'date-fns/locale';
 import { Button } from '@/components/ui/button';
-import { CheckCircle, X, Eye } from 'lucide-react';
+import { CheckCircle, X, Loader2 } from 'lucide-react';
+import { toast } from 'sonner';
 
 const statusLabels: Record<string, string> = {
   pending: 'Oczekuje',
@@ -19,6 +20,28 @@ const statusColors: Record<string, string> = {
 };
 
 const AdminAppointments = () => {
+  const { appointments, loading: loadingA, updateAppointment } = useAppointments();
+  const { services, loading: loadingS } = useServices();
+  const { employees, loading: loadingE } = useEmployees();
+
+  const loading = loadingA || loadingS || loadingE;
+
+  const handleConfirm = async (id: string) => {
+    try {
+      await updateAppointment(id, { status: 'confirmed' });
+      toast.success('Wizyta potwierdzona');
+    } catch { toast.error('Błąd'); }
+  };
+
+  const handleCancel = async (id: string) => {
+    try {
+      await updateAppointment(id, { status: 'cancelled' });
+      toast.success('Wizyta anulowana');
+    } catch { toast.error('Błąd'); }
+  };
+
+  if (loading) return <div className="flex items-center justify-center py-20"><Loader2 className="w-6 h-6 animate-spin text-primary" /></div>;
+
   return (
     <div className="space-y-6">
       <h1 className="font-heading text-2xl font-bold">Wizyty</h1>
@@ -37,9 +60,9 @@ const AdminAppointments = () => {
               </tr>
             </thead>
             <tbody>
-              {mockAppointments.map((appt) => {
-                const service = mockServices.find(s => s.id === appt.serviceId);
-                const employee = mockEmployees.find(e => e.id === appt.employeeId);
+              {appointments.map((appt) => {
+                const service = services.find(s => s.id === appt.serviceId);
+                const employee = employees.find(e => e.id === appt.employeeId);
                 return (
                   <tr key={appt.id} className="border-b border-border/50 hover:bg-secondary/30 transition-colors">
                     <td className="p-3">
@@ -62,10 +85,10 @@ const AdminAppointments = () => {
                     </td>
                     <td className="p-3 text-right">
                       <div className="flex justify-end gap-1">
-                        <Button variant="ghost" size="icon" className="h-7 w-7" title="Potwierdź">
+                        <Button variant="ghost" size="icon" className="h-7 w-7" title="Potwierdź" onClick={() => handleConfirm(appt.id)}>
                           <CheckCircle className="w-3.5 h-3.5 text-green-600" />
                         </Button>
-                        <Button variant="ghost" size="icon" className="h-7 w-7" title="Anuluj">
+                        <Button variant="ghost" size="icon" className="h-7 w-7" title="Anuluj" onClick={() => handleCancel(appt.id)}>
                           <X className="w-3.5 h-3.5 text-destructive" />
                         </Button>
                       </div>
@@ -73,6 +96,9 @@ const AdminAppointments = () => {
                   </tr>
                 );
               })}
+              {appointments.length === 0 && (
+                <tr><td colSpan={6} className="p-8 text-center text-muted-foreground">Brak wizyt</td></tr>
+              )}
             </tbody>
           </table>
         </div>
