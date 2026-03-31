@@ -1,59 +1,55 @@
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import { mockEmployees, Employee } from '@/data/services';
+import {
+  onAuthStateChanged,
+  signInWithEmailAndPassword,
+  signOut,
+  User,
+} from 'firebase/auth';
+import { auth } from '@/lib/firebase';
 
 interface AuthContextType {
-  employee: Employee | null;
+  user: User | null;
   isAuthenticated: boolean;
-  login: (email: string, password: string) => boolean;
-  logout: () => void;
+  loading: boolean;
+  login: (email: string, password: string) => Promise<boolean>;
+  logout: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType>({
-  employee: null,
+  user: null,
   isAuthenticated: false,
-  login: () => false,
-  logout: () => {},
+  loading: true,
+  login: async () => false,
+  logout: async () => {},
 });
 
-// Mock credentials — replace with Firebase Auth
-const MOCK_CREDENTIALS: Record<string, { password: string; employeeId: string }> = {
-  'anna@majlibeauty.pl': { password: 'admin123', employeeId: '1' },
-  'marta@majlibeauty.pl': { password: 'admin123', employeeId: '2' },
-  'karolina@majlibeauty.pl': { password: 'admin123', employeeId: '3' },
-};
-
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [employee, setEmployee] = useState<Employee | null>(null);
+  const [user, setUser] = useState<User | null>(null);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const stored = localStorage.getItem('majli_employee_id');
-    if (stored) {
-      const emp = mockEmployees.find(e => e.id === stored);
-      if (emp) setEmployee(emp);
-    }
+    const unsubscribe = onAuthStateChanged(auth, (firebaseUser) => {
+      setUser(firebaseUser);
+      setLoading(false);
+    });
+    return unsubscribe;
   }, []);
 
-  const login = (email: string, password: string): boolean => {
-    const cred = MOCK_CREDENTIALS[email.toLowerCase()];
-    if (cred && cred.password === password) {
-      const emp = mockEmployees.find(e => e.id === cred.employeeId);
-      if (emp) {
-        setEmployee(emp);
-        localStorage.setItem('majli_employee_id', emp.id);
-        return true;
-      }
+  const login = async (email: string, password: string): Promise<boolean> => {
+    try {
+      await signInWithEmailAndPassword(auth, email, password);
+      return true;
+    } catch {
+      return false;
     }
-    return false;
   };
 
-  const logout = () => {
-    setEmployee(null);
-    localStorage.removeItem('majli_employee_id');
-    localStorage.removeItem('majli_admin');
+  const logout = async () => {
+    await signOut(auth);
   };
 
   return (
-    <AuthContext.Provider value={{ employee, isAuthenticated: !!employee, login, logout }}>
+    <AuthContext.Provider value={{ user, isAuthenticated: !!user, loading, login, logout }}>
       {children}
     </AuthContext.Provider>
   );
