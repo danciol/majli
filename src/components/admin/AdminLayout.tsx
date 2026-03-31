@@ -16,7 +16,7 @@ const links = [
 export function AdminLayout() {
   const location = useLocation();
   const navigate = useNavigate();
-  const { isAuthenticated, employee, logout } = useAuth();
+  const { isAuthenticated, user, logout, loading } = useAuth();
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
   if (!isAuthenticated) {
