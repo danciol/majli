@@ -47,11 +47,32 @@ const AdminDashboard = () => {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="font-heading text-2xl md:text-3xl font-bold">Dashboard</h1>
-        <p className="text-muted-foreground text-sm mt-1">
-          {format(today, "EEEE, d MMMM yyyy", { locale: pl })}
-        </p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="font-heading text-2xl md:text-3xl font-bold">Dashboard</h1>
+          <p className="text-muted-foreground text-sm mt-1">
+            {format(today, "EEEE, d MMMM yyyy", { locale: pl })}
+          </p>
+        </div>
+        {services.length === 0 && employees.length === 0 && (
+          <Button
+            variant="outline"
+            size="sm"
+            disabled={seeding}
+            onClick={async () => {
+              setSeeding(true);
+              try {
+                const seeded = await seedFirestore();
+                if (seeded) toast.success('Dane początkowe dodane do Firestore!');
+                else toast.info('Baza już zawiera dane');
+              } catch { toast.error('Błąd seedowania'); }
+              setSeeding(false);
+            }}
+          >
+            <Database className="w-4 h-4 mr-2" />
+            {seeding ? 'Dodawanie...' : 'Załaduj dane początkowe'}
+          </Button>
+        )}
       </div>
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
