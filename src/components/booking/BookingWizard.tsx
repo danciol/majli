@@ -5,8 +5,9 @@ import { StepEmployee } from './StepEmployee';
 import { StepDateTime } from './StepDateTime';
 import { StepClientForm } from './StepClientForm';
 import { StepConfirmation } from './StepConfirmation';
-import { mockServices, mockEmployees, mockAppointments, Service, Employee } from '@/data/services';
-import { X } from 'lucide-react';
+import { Service, Employee } from '@/data/services';
+import { useServices, useEmployees, useAppointments } from '@/hooks/useFirestore';
+import { X, Loader2 } from 'lucide-react';
 
 export interface BookingData {
   service: Service | null;
@@ -26,7 +27,13 @@ interface BookingWizardProps {
 const stepLabels = ['Usługa', 'Pracownik', 'Termin', 'Dane', 'Potwierdzenie'];
 
 export function BookingWizard({ onClose, initialServiceId }: BookingWizardProps) {
-  const initialService = initialServiceId ? mockServices.find(s => s.id === initialServiceId) ?? null : null;
+  const { services, loading: loadingS } = useServices();
+  const { employees, loading: loadingE } = useEmployees();
+  const { appointments, loading: loadingA } = useAppointments();
+
+  const loading = loadingS || loadingE || loadingA;
+
+  const initialService = initialServiceId ? services.find(s => s.id === initialServiceId) ?? null : null;
   const [step, setStep] = useState(initialService ? 1 : 0);
   const [booking, setBooking] = useState<BookingData>({
     service: initialService,
@@ -41,7 +48,7 @@ export function BookingWizard({ onClose, initialServiceId }: BookingWizardProps)
   const update = (data: Partial<BookingData>) => setBooking(prev => ({ ...prev, ...data }));
 
   const availableEmployees = booking.service
-    ? mockEmployees.filter(e => booking.service!.employeeIds.includes(e.id))
+    ? employees.filter(e => booking.service!.employeeIds.includes(e.id))
     : [];
 
   const slideVariants = {
@@ -54,7 +61,6 @@ export function BookingWizard({ onClose, initialServiceId }: BookingWizardProps)
     <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
       <div className="absolute inset-0 bg-foreground/30 backdrop-blur-sm" onClick={onClose} />
       <div className="relative bg-card rounded-2xl shadow-2xl w-full max-w-lg max-h-[90vh] overflow-hidden flex flex-col z-10">
-        {/* Header */}
         <div className="flex items-center justify-between p-5 border-b border-border">
           <h2 className="font-heading text-xl font-semibold text-foreground">Rezerwacja wizyty</h2>
           <button onClick={onClose} className="text-muted-foreground hover:text-foreground transition-colors">
@@ -62,7 +68,6 @@ export function BookingWizard({ onClose, initialServiceId }: BookingWizardProps)
           </button>
         </div>
 
-        {/* Progress */}
         {step < 4 && (
           <div className="px-5 pt-4">
             <div className="flex items-center gap-1">
@@ -78,55 +83,60 @@ export function BookingWizard({ onClose, initialServiceId }: BookingWizardProps)
           </div>
         )}
 
-        {/* Content */}
         <div className="flex-1 overflow-y-auto p-5">
-          <AnimatePresence mode="wait">
-            <motion.div
-              key={step}
-              variants={slideVariants}
-              initial="enter"
-              animate="center"
-              exit="exit"
-              transition={{ duration: 0.25 }}
-            >
-              {step === 0 && (
-                <StepService
-                  services={mockServices.filter(s => s.active)}
-                  selected={booking.service}
-                  onSelect={(s) => { update({ service: s, employee: null, date: null, time: null }); setStep(1); }}
-                />
-              )}
-              {step === 1 && (
-                <StepEmployee
-                  employees={availableEmployees}
-                  selected={booking.employee}
-                  onSelect={(e) => { update({ employee: e, date: null, time: null }); setStep(2); }}
-                  onBack={() => setStep(0)}
-                />
-              )}
-              {step === 2 && booking.service && booking.employee && (
-                <StepDateTime
-                  employee={booking.employee}
-                  serviceDuration={booking.service.duration}
-                  appointments={mockAppointments}
-                  selectedDate={booking.date}
-                  selectedTime={booking.time}
-                  onSelect={(date, time) => { update({ date, time }); setStep(3); }}
-                  onBack={() => setStep(1)}
-                />
-              )}
-              {step === 3 && (
-                <StepClientForm
-                  booking={booking}
-                  onSubmit={(data) => { update(data); setStep(4); }}
-                  onBack={() => setStep(2)}
-                />
-              )}
-              {step === 4 && (
-                <StepConfirmation booking={booking} onClose={onClose} />
-              )}
-            </motion.div>
-          </AnimatePresence>
+          {loading ? (
+            <div className="flex items-center justify-center py-12">
+              <Loader2 className="w-6 h-6 animate-spin text-primary" />
+            </div>
+          ) : (
+            <AnimatePresence mode="wait">
+              <motion.div
+                key={step}
+                variants={slideVariants}
+                initial="enter"
+                animate="center"
+                exit="exit"
+                transition={{ duration: 0.25 }}
+              >
+                {step === 0 && (
+                  <StepService
+                    services={services.filter(s => s.active)}
+                    selected={booking.service}
+                    onSelect={(s) => { update({ service: s, employee: null, date: null, time: null }); setStep(1); }}
+                  />
+                )}
+                {step === 1 && (
+                  <StepEmployee
+                    employees={availableEmployees}
+                    selected={booking.employee}
+                    onSelect={(e) => { update({ employee: e, date: null, time: null }); setStep(2); }}
+                    onBack={() => setStep(0)}
+                  />
+                )}
+                {step === 2 && booking.service && booking.employee && (
+                  <StepDateTime
+                    employee={booking.employee}
+                    serviceDuration={booking.service.duration}
+                    appointments={appointments}
+                    selectedDate={booking.date}
+                    selectedTime={booking.time}
+                    onSelect={(date, time) => { update({ date, time }); setStep(3); }}
+                    onBack={() => setStep(1)}
+                  />
+                )}
+                {step === 3 && (
+                  <StepClientForm
+                    booking={booking}
+                    onSubmit={(data) => { update(data); setStep(4); }}
+                    onBack={() => setStep(2)}
+                  />
+                )}
+                {step === 4 && (
+                  <StepConfirmation booking={booking} onClose={onClose} />
+                )}
+              </motion.div>
+            </AnimatePresence>
+          )}
         </div>
       </div>
     </div>
