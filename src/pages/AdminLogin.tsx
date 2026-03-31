@@ -5,20 +5,24 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { toast } from 'sonner';
 import { useAuth } from '@/contexts/AuthContext';
+import { Loader2 } from 'lucide-react';
 
 const AdminLogin = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
   const navigate = useNavigate();
   const { login } = useAuth();
 
-  const handleLogin = (e: React.FormEvent) => {
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!email || !password) {
       toast.error('Wprowadź email i hasło');
       return;
     }
-    const success = login(email, password);
+    setIsLoading(true);
+    const success = await login(email, password);
+    setIsLoading(false);
     if (success) {
       toast.success('Zalogowano pomyślnie');
       navigate('/admin');
@@ -37,30 +41,18 @@ const AdminLogin = () => {
         <form onSubmit={handleLogin} className="space-y-4">
           <div>
             <Label htmlFor="email">Email</Label>
-            <Input
-              id="email"
-              type="email"
-              placeholder="anna@majlibeauty.pl"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-            />
+            <Input id="email" type="email" placeholder="email@majlibeauty.pl" value={email} onChange={(e) => setEmail(e.target.value)} />
           </div>
           <div>
             <Label htmlFor="password">Hasło</Label>
-            <Input
-              id="password"
-              type="password"
-              placeholder="••••••••"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-            />
+            <Input id="password" type="password" placeholder="••••••••" value={password} onChange={(e) => setPassword(e.target.value)} />
           </div>
-          <Button type="submit" className="w-full bg-primary text-primary-foreground">
-            Zaloguj się
+          <Button type="submit" className="w-full" disabled={isLoading}>
+            {isLoading ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Logowanie...</> : 'Zaloguj się'}
           </Button>
         </form>
         <p className="text-xs text-muted-foreground text-center mt-6">
-          Dane testowe: anna@majlibeauty.pl / admin123
+          Utwórz konto w Firebase Console → Authentication
         </p>
       </div>
     </div>
