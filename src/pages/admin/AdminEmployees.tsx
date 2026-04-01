@@ -65,6 +65,7 @@ const AdminEmployees = () => {
 
   const dayLabels: Record<string, string> = {
     mon: 'Pon', tue: 'Wt', wed: 'Śr', thu: 'Czw', fri: 'Pt', sat: 'Sob', sun: 'Nd',
+    monday: 'Pon', tuesday: 'Wt', wednesday: 'Śr', thursday: 'Czw', friday: 'Pt', saturday: 'Sob', sunday: 'Nd',
   };
 
   if (loading) return <div className="flex items-center justify-center py-20"><Loader2 className="w-6 h-6 animate-spin text-primary" /></div>;
@@ -98,19 +99,25 @@ const AdminEmployees = () => {
               </div>
             </div>
 
-            <div className="mb-3">
-              <p className="text-xs text-muted-foreground font-medium mb-1.5">Godziny pracy</p>
-              <div className="flex flex-wrap gap-1.5">
-                {Object.entries(emp.workingHours).map(([day, h]) => (
-                  <span key={day} className="text-xs bg-secondary px-2 py-1 rounded">
-                    {dayLabels[day]}: {h.start}-{h.end}
-                  </span>
-                ))}
+            {emp.workingHours && (
+              <div className="mb-3">
+                <p className="text-xs text-muted-foreground font-medium mb-1.5">Godziny pracy</p>
+                <div className="flex flex-wrap gap-1.5">
+                  {Object.entries(emp.workingHours).map(([day, h]) => {
+                    const label = dayLabels[day] || day;
+                    const display = typeof h === 'string' ? h : (h && typeof h === 'object' && 'start' in h) ? `${h.start}-${h.end}` : '';
+                    return (
+                      <span key={day} className="text-xs bg-secondary px-2 py-1 rounded">
+                        {label}: {display}
+                      </span>
+                    );
+                  })}
+                </div>
               </div>
-            </div>
+            )}
 
             <p className="text-xs text-muted-foreground">
-              Usługi: {emp.services.length}
+              Usługi: {emp.services?.length ?? 0}
             </p>
           </div>
         ))}
