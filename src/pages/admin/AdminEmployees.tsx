@@ -8,44 +8,105 @@ import { Label } from '@/components/ui/label';
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle,
 } from '@/components/ui/dialog';
+import {
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+} from '@/components/ui/select';
 import { toast } from 'sonner';
+
+const DAYS = [
+  { key: 'monday', label: 'Poniedziałek' },
+  { key: 'tuesday', label: 'Wtorek' },
+  { key: 'wednesday', label: 'Środa' },
+  { key: 'thursday', label: 'Czwartek' },
+  { key: 'friday', label: 'Piątek' },
+  { key: 'saturday', label: 'Sobota' },
+  { key: 'sunday', label: 'Niedziela' },
+];
+
+const dayLabelsShort: Record<string, string> = {
+  monday: 'Pon', tuesday: 'Wt', wednesday: 'Śr', thursday: 'Czw',
+  friday: 'Pt', saturday: 'Sob', sunday: 'Nd',
+  mon: 'Pon', tue: 'Wt', wed: 'Śr', thu: 'Czw',
+  fri: 'Pt', sat: 'Sob', sun: 'Nd',
+};
+
+interface EmployeeForm {
+  name: string;
+  role: string;
+  login: string;
+  password: string;
+  workingHours: Record<string, string>;
+  daysOff: string;
+}
+
+const defaultWorkingHours: Record<string, string> = {
+  monday: '9:00-17:00',
+  tuesday: '9:00-17:00',
+  wednesday: '9:00-17:00',
+  thursday: '9:00-17:00',
+  friday: '9:00-17:00',
+  saturday: 'wolne',
+  sunday: 'wolne',
+};
 
 const AdminEmployees = () => {
   const { employees, loading, addEmployee, updateEmployee, deleteEmployee } = useEmployees();
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editing, setEditing] = useState<Employee | null>(null);
-  const [form, setForm] = useState({ name: '' });
+  const [form, setForm] = useState<EmployeeForm>({
+    name: '', role: 'pracownik', login: '', password: '',
+    workingHours: { ...defaultWorkingHours }, daysOff: '',
+  });
 
   const openNew = () => {
     setEditing(null);
-    setForm({ name: '' });
+    setForm({
+      name: '', role: 'pracownik', login: '', password: '',
+      workingHours: { ...defaultWorkingHours }, daysOff: '',
+    });
     setDialogOpen(true);
   };
 
   const openEdit = (e: Employee) => {
     setEditing(e);
-    setForm({ name: e.name });
+    // Convert workingHours to string format if needed
+    const wh: Record<string, string> = {};
+    for (const [day, val] of Object.entries(e.workingHours)) {
+      wh[day] = typeof val === 'string' ? val : `${val.start}-${val.end}`;
+    }
+    setForm({
+      name: e.name,
+      role: e.role || 'pracownik',
+      login: e.login || '',
+      password: e.password || '',
+      workingHours: wh,
+      daysOff: (e.daysOff || []).join(', '),
+    });
     setDialogOpen(true);
+  };
+
+  const setWH = (day: string, value: string) => {
+    setForm(f => ({ ...f, workingHours: { ...f.workingHours, [day]: value } }));
   };
 
   const handleSave = async () => {
     if (!form.name) { toast.error('Wprowadź imię'); return; }
     try {
+      const daysOff = form.daysOff.split(',').map(s => s.trim()).filter(Boolean);
+      const data: Record<string, unknown> = {
+        name: form.name,
+        role: form.role,
+        login: form.login,
+        password: form.password,
+        workingHours: form.workingHours,
+        daysOff,
+      };
       if (editing) {
-        await updateEmployee(editing.id, { name: form.name });
+        await updateEmployee(editing.id, data as Partial<Employee>);
         toast.success('Pracownik zaktualizowany');
       } else {
-        await addEmployee({
-          name: form.name, photo: '', services: [],
-          workingHours: {
-            mon: { start: '09:00', end: '17:00' },
-            tue: { start: '09:00', end: '17:00' },
-            wed: { start: '09:00', end: '17:00' },
-            thu: { start: '09:00', end: '17:00' },
-            fri: { start: '09:00', end: '17:00' },
-          },
-          daysOff: [],
-        });
+        data.canViewCalendars = [];
+        await addEmployee(data as Omit<Employee, 'id'>);
         toast.success('Pracownik dodany');
       }
       setDialogOpen(false);
@@ -61,11 +122,6 @@ const AdminEmployees = () => {
     } catch {
       toast.error('Błąd usuwania');
     }
-  };
-
-  const dayLabels: Record<string, string> = {
-    mon: 'Pon', tue: 'Wt', wed: 'Śr', thu: 'Czw', fri: 'Pt', sat: 'Sob', sun: 'Nd',
-    monday: 'Pon', tuesday: 'Wt', wednesday: 'Śr', thursday: 'Czw', friday: 'Pt', saturday: 'Sob', sunday: 'Nd',
   };
 
   if (loading) return <div className="flex items-center justify-center py-20"><Loader2 className="w-6 h-6 animate-spin text-primary" /></div>;
@@ -87,7 +143,10 @@ const AdminEmployees = () => {
                 <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center">
                   <User className="w-6 h-6 text-primary" />
                 </div>
-                <h3 className="font-heading font-semibold">{emp.name}</h3>
+                <div>
+                  <h3 className="font-heading font-semibold">{emp.name}</h3>
+                  <p className="text-xs text-muted-foreground capitalize">{emp.role || 'pracownik'}</p>
+                </div>
               </div>
               <div className="flex gap-1">
                 <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => openEdit(emp)}>
@@ -104,8 +163,8 @@ const AdminEmployees = () => {
                 <p className="text-xs text-muted-foreground font-medium mb-1.5">Godziny pracy</p>
                 <div className="flex flex-wrap gap-1.5">
                   {Object.entries(emp.workingHours).map(([day, h]) => {
-                    const label = dayLabels[day] || day;
-                    const display = typeof h === 'string' ? h : (h && typeof h === 'object' && 'start' in h) ? `${h.start}-${h.end}` : '';
+                    const label = dayLabelsShort[day] || day;
+                    const display = typeof h === 'string' ? h : `${h.start}-${h.end}`;
                     return (
                       <span key={day} className="text-xs bg-secondary px-2 py-1 rounded">
                         {label}: {display}
@@ -116,9 +175,11 @@ const AdminEmployees = () => {
               </div>
             )}
 
-            <p className="text-xs text-muted-foreground">
-              Usługi: {emp.services?.length ?? 0}
-            </p>
+            {emp.daysOff && emp.daysOff.length > 0 && (
+              <p className="text-xs text-muted-foreground">
+                Dni wolne: {emp.daysOff.length}
+              </p>
+            )}
           </div>
         ))}
       </div>
@@ -128,15 +189,62 @@ const AdminEmployees = () => {
       )}
 
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent>
+        <DialogContent className="max-h-[85vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="font-heading">{editing ? 'Edytuj pracownika' : 'Dodaj pracownika'}</DialogTitle>
           </DialogHeader>
           <div className="space-y-4 pt-2">
             <div>
-              <Label>Imię i nazwisko</Label>
-              <Input value={form.name} onChange={e => setForm({ name: e.target.value })} />
+              <Label>Imię</Label>
+              <Input value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} />
             </div>
+            <div>
+              <Label>Rola</Label>
+              <Select value={form.role} onValueChange={v => setForm(f => ({ ...f, role: v }))}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="admin">Admin</SelectItem>
+                  <SelectItem value="pracownik">Pracownik</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <Label>Login</Label>
+                <Input value={form.login} onChange={e => setForm(f => ({ ...f, login: e.target.value }))} />
+              </div>
+              <div>
+                <Label>Hasło</Label>
+                <Input value={form.password} onChange={e => setForm(f => ({ ...f, password: e.target.value }))} />
+              </div>
+            </div>
+
+            <div>
+              <Label className="mb-2 block">Godziny pracy</Label>
+              <div className="space-y-2">
+                {DAYS.map(({ key, label }) => (
+                  <div key={key} className="flex items-center gap-3">
+                    <span className="text-sm w-28 shrink-0">{label}</span>
+                    <Input
+                      value={form.workingHours[key] || ''}
+                      onChange={e => setWH(key, e.target.value)}
+                      placeholder="np. 6:00-22:00 lub wolne"
+                      className="text-sm"
+                    />
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div>
+              <Label>Dni wolne (daty oddzielone przecinkami, np. 2026-04-11, 2026-04-25)</Label>
+              <Input
+                value={form.daysOff}
+                onChange={e => setForm(f => ({ ...f, daysOff: e.target.value }))}
+                placeholder="2026-04-11, 2026-04-25"
+              />
+            </div>
+
             <Button onClick={handleSave} className="w-full bg-primary text-primary-foreground">
               {editing ? 'Zapisz' : 'Dodaj'}
             </Button>
