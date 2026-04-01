@@ -5,6 +5,7 @@ import { Plus, Edit2, Trash2, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Checkbox } from '@/components/ui/checkbox';
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle,
 } from '@/components/ui/dialog';
@@ -12,21 +13,35 @@ import { toast } from 'sonner';
 
 const AdminServices = () => {
   const { services, loading, addService, updateService, deleteService } = useServices();
-  const { employees } = useEmployees();
+  const { employees, loading: loadingE } = useEmployees();
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editing, setEditing] = useState<Service | null>(null);
-  const [form, setForm] = useState({ name: '', price: '', duration: '' });
+  const [form, setForm] = useState({ name: '', price: '', duration: '', employeeIds: [] as string[] });
 
   const openNew = () => {
     setEditing(null);
-    setForm({ name: '', price: '', duration: '' });
+    setForm({ name: '', price: '', duration: '', employeeIds: [] });
     setDialogOpen(true);
   };
 
   const openEdit = (s: Service) => {
     setEditing(s);
-    setForm({ name: s.name, price: String(s.price), duration: String(s.duration) });
+    setForm({
+      name: s.name,
+      price: String(s.price),
+      duration: String(s.duration),
+      employeeIds: s.employees || s.employeeIds || [],
+    });
     setDialogOpen(true);
+  };
+
+  const toggleEmployee = (empId: string) => {
+    setForm(f => ({
+      ...f,
+      employeeIds: f.employeeIds.includes(empId)
+        ? f.employeeIds.filter(id => id !== empId)
+        : [...f.employeeIds, empId],
+    }));
   };
 
   const handleSave = async () => {
@@ -35,15 +50,17 @@ const AdminServices = () => {
       return;
     }
     try {
+      const data = {
+        name: form.name,
+        price: Number(form.price),
+        duration: Number(form.duration),
+        employees: form.employeeIds,
+      };
       if (editing) {
-        await updateService(editing.id, { name: form.name, price: Number(form.price), duration: Number(form.duration) });
+        await updateService(editing.id, data);
         toast.success('Usługa zaktualizowana');
       } else {
-        await addService({
-          name: form.name,
-          price: Number(form.price),
-          duration: Number(form.duration),
-        } as Omit<Service, 'id'>);
+        await addService(data as Omit<Service, 'id'>);
         toast.success('Usługa dodana');
       }
       setDialogOpen(false);
@@ -66,7 +83,7 @@ const AdminServices = () => {
     return ids.map(id => employees.find(e => e.id === id)?.name).filter(Boolean).join(', ');
   };
 
-  if (loading) return <div className="flex items-center justify-center py-20"><Loader2 className="w-6 h-6 animate-spin text-primary" /></div>;
+  if (loading || loadingE) return <div className="flex items-center justify-center py-20"><Loader2 className="w-6 h-6 animate-spin text-primary" /></div>;
 
   return (
     <div className="space-y-6">
@@ -84,7 +101,7 @@ const AdminServices = () => {
               <div>
                 <p className="font-medium text-sm">{s.name}</p>
                 <p className="text-xs text-muted-foreground">
-                  {s.duration} min &middot; {s.price} zł
+                  {s.duration} min · {s.price} zł
                   {getEmployeeNames(s) && ` · ${getEmployeeNames(s)}`}
                 </p>
               </div>
@@ -106,7 +123,7 @@ const AdminServices = () => {
       )}
 
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent>
+        <DialogContent className="max-h-[85vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="font-heading">{editing ? 'Edytuj usługę' : 'Dodaj usługę'}</DialogTitle>
           </DialogHeader>
@@ -123,6 +140,21 @@ const AdminServices = () => {
               <div>
                 <Label>Czas (min)</Label>
                 <Input type="number" value={form.duration} onChange={e => setForm(f => ({ ...f, duration: e.target.value }))} />
+              </div>
+            </div>
+            <div>
+              <Label className="mb-2 block">Przypisani pracownicy</Label>
+              <div className="space-y-2">
+                {employees.map(emp => (
+                  <label key={emp.id} className="flex items-center gap-2 cursor-pointer">
+                    <Checkbox
+                      checked={form.employeeIds.includes(emp.id)}
+                      onCheckedChange={() => toggleEmployee(emp.id)}
+                    />
+                    <span className="text-sm">{emp.name}</span>
+                  </label>
+                ))}
+                {employees.length === 0 && <p className="text-xs text-muted-foreground">Brak pracowników</p>}
               </div>
             </div>
             <Button onClick={handleSave} className="w-full bg-primary text-primary-foreground">
