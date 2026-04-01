@@ -1,20 +1,25 @@
 export interface Service {
   id: string;
   name: string;
-  category: string;
+  category?: string;
   price: number;
   duration: number;
-  description: string;
-  employeeIds: string[];
-  active: boolean;
+  description?: string;
+  employeeIds?: string[];
+  employees?: string[];
+  active?: boolean;
 }
 
 export interface Employee {
   id: string;
   name: string;
-  photo: string;
-  services: string[];
-  workingHours: Record<string, { start: string; end: string }>;
+  photo?: string;
+  services?: string[];
+  role?: string;
+  login?: string;
+  password?: string;
+  canViewCalendars?: string[];
+  workingHours: Record<string, { start: string; end: string } | string>;
   daysOff: string[];
 }
 
