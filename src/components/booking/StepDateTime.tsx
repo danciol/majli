@@ -22,8 +22,19 @@ function generateSlots(employee: Employee, date: Date, duration: number, appoint
   const hours = employee.workingHours[dayKey];
   if (!hours) return [];
 
-  const [startH, startM] = hours.start.split(':').map(Number);
-  const [endH, endM] = hours.end.split(':').map(Number);
+  let startStr: string, endStr: string;
+  if (typeof hours === 'string') {
+    if (hours === 'wolne') return [];
+    const parts = hours.split('-');
+    startStr = parts[0];
+    endStr = parts[1];
+  } else {
+    startStr = hours.start;
+    endStr = hours.end;
+  }
+
+  const [startH, startM] = startStr.split(':').map(Number);
+  const [endH, endM] = endStr.split(':').map(Number);
   const startMin = startH * 60 + startM;
   const endMin = endH * 60 + endM;
 
