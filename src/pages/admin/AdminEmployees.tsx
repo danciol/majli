@@ -56,7 +56,7 @@ const AdminEmployees = () => {
   const [editing, setEditing] = useState<Employee | null>(null);
   const [form, setForm] = useState<EmployeeForm>({
     name: '', role: 'pracownik', login: '', password: '',
-    workingHours: { ...defaultWorkingHours }, daysOff: '',
+    workingHours: { ...defaultWorkingHours }, daysOff: '', canViewCalendars: [],
   });
 
   const openNew = () => {
