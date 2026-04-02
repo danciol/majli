@@ -11,7 +11,7 @@ import {
   QueryConstraint,
 } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
-import type { Service, Employee, Appointment } from '@/data/services';
+import type { Service, Employee, Appointment, Client } from '@/data/services';
 
 // Generic hook for real-time Firestore collection
 function useCollection<T extends { id: string }>(
