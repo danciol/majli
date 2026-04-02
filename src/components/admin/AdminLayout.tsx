@@ -16,7 +16,7 @@ const links = [
 export function AdminLayout() {
   const location = useLocation();
   const navigate = useNavigate();
-  const { isAuthenticated, user, logout, loading } = useAuth();
+  const { isAuthenticated, employee, logout, loading } = useAuth();
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
   if (loading) return <div className="min-h-screen flex items-center justify-center"><span className="text-muted-foreground">Ładowanie...</span></div>;
@@ -66,7 +66,8 @@ export function AdminLayout() {
         <div className="absolute bottom-0 left-0 right-0 p-3 border-t border-border">
           <div className="px-4 py-2 mb-2">
             <p className="text-xs text-muted-foreground">Zalogowano jako</p>
-            <p className="text-sm font-medium text-foreground truncate">{user?.email}</p>
+            <p className="text-sm font-medium text-foreground truncate">{employee?.name}</p>
+            <p className="text-xs text-muted-foreground truncate">{employee?.role || 'pracownik'}</p>
           </div>
           <button
             onClick={handleLogout}

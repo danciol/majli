@@ -1,55 +1,81 @@
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import {
-  onAuthStateChanged,
-  signInWithEmailAndPassword,
-  signOut,
-  User,
-} from 'firebase/auth';
-import { auth } from '@/lib/firebase';
+import { collection, query, where, getDocs } from 'firebase/firestore';
+import { db } from '@/lib/firebase';
+import type { Employee } from '@/data/services';
 
 interface AuthContextType {
-  user: User | null;
+  employee: Employee | null;
   isAuthenticated: boolean;
   loading: boolean;
-  login: (email: string, password: string) => Promise<boolean>;
-  logout: () => Promise<void>;
+  login: (login: string, password: string) => Promise<boolean>;
+  logout: () => void;
 }
 
 const AuthContext = createContext<AuthContextType>({
-  user: null,
+  employee: null,
   isAuthenticated: false,
   loading: true,
   login: async () => false,
-  logout: async () => {},
+  logout: () => {},
 });
 
+const STORAGE_KEY = 'majli_employee_id';
+
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [user, setUser] = useState<User | null>(null);
+  const [employee, setEmployee] = useState<Employee | null>(null);
   const [loading, setLoading] = useState(true);
 
+  // Restore session from localStorage
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (firebaseUser) => {
-      setUser(firebaseUser);
+    const storedId = localStorage.getItem(STORAGE_KEY);
+    if (!storedId) {
       setLoading(false);
-    });
-    return unsubscribe;
+      return;
+    }
+    // Verify employee still exists
+    const verify = async () => {
+      try {
+        const snap = await getDocs(collection(db, 'employees'));
+        const found = snap.docs.find(d => d.id === storedId);
+        if (found) {
+          setEmployee({ ...found.data(), id: found.id } as Employee);
+        } else {
+          localStorage.removeItem(STORAGE_KEY);
+        }
+      } catch {
+        localStorage.removeItem(STORAGE_KEY);
+      }
+      setLoading(false);
+    };
+    verify();
   }, []);
 
-  const login = async (email: string, password: string): Promise<boolean> => {
+  const login = async (loginVal: string, passwordVal: string): Promise<boolean> => {
     try {
-      await signInWithEmailAndPassword(auth, email, password);
+      const q = query(
+        collection(db, 'employees'),
+        where('login', '==', loginVal),
+        where('password', '==', passwordVal)
+      );
+      const snap = await getDocs(q);
+      if (snap.empty) return false;
+      const doc = snap.docs[0];
+      const emp = { ...doc.data(), id: doc.id } as Employee;
+      setEmployee(emp);
+      localStorage.setItem(STORAGE_KEY, emp.id);
       return true;
     } catch {
       return false;
     }
   };
 
-  const logout = async () => {
-    await signOut(auth);
+  const logout = () => {
+    setEmployee(null);
+    localStorage.removeItem(STORAGE_KEY);
   };
 
   return (
-    <AuthContext.Provider value={{ user, isAuthenticated: !!user, loading, login, logout }}>
+    <AuthContext.Provider value={{ employee, isAuthenticated: !!employee, loading, login, logout }}>
       {children}
     </AuthContext.Provider>
   );
