@@ -2,6 +2,7 @@ import { useState } from 'react';
 import type { Employee } from '@/data/services';
 import { useEmployees } from '@/hooks/useFirestore';
 import { Plus, Edit2, Trash2, User, Loader2 } from 'lucide-react';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
