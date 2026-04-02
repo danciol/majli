@@ -8,26 +8,26 @@ import { useAuth } from '@/contexts/AuthContext';
 import { Loader2 } from 'lucide-react';
 
 const AdminLogin = () => {
-  const [email, setEmail] = useState('');
+  const [login, setLogin] = useState('');
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const navigate = useNavigate();
-  const { login } = useAuth();
+  const { login: doLogin } = useAuth();
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!email || !password) {
-      toast.error('Wprowadź email i hasło');
+    if (!login || !password) {
+      toast.error('Wprowadź login i hasło');
       return;
     }
     setIsLoading(true);
-    const success = await login(email, password);
+    const success = await doLogin(login, password);
     setIsLoading(false);
     if (success) {
       toast.success('Zalogowano pomyślnie');
       navigate('/admin');
     } else {
-      toast.error('Nieprawidłowy email lub hasło');
+      toast.error('Nieprawidłowy login lub hasło');
     }
   };
 
@@ -40,8 +40,8 @@ const AdminLogin = () => {
         </div>
         <form onSubmit={handleLogin} className="space-y-4">
           <div>
-            <Label htmlFor="email">Email</Label>
-            <Input id="email" type="email" placeholder="email@majlibeauty.pl" value={email} onChange={(e) => setEmail(e.target.value)} />
+            <Label htmlFor="login">Login</Label>
+            <Input id="login" type="text" placeholder="Twój login" value={login} onChange={(e) => setLogin(e.target.value)} />
           </div>
           <div>
             <Label htmlFor="password">Hasło</Label>
@@ -52,7 +52,7 @@ const AdminLogin = () => {
           </Button>
         </form>
         <p className="text-xs text-muted-foreground text-center mt-6">
-          Utwórz konto w Firebase Console → Authentication
+          Login i hasło ustala administrator w zakładce Pracownicy
         </p>
       </div>
     </div>
