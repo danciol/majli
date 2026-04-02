@@ -1,16 +1,17 @@
 import { Outlet, Link, useLocation, useNavigate, Navigate } from 'react-router-dom';
 import {
-  LayoutDashboard, Calendar, Scissors, Users, ClipboardList, LogOut, Menu, X,
+  LayoutDashboard, Calendar, Scissors, Users, ClipboardList, LogOut, Menu, X, UserCheck,
 } from 'lucide-react';
 import { useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 
-const links = [
-  { to: '/admin', label: 'Dashboard', icon: LayoutDashboard },
-  { to: '/admin/kalendarz', label: 'Kalendarz', icon: Calendar },
-  { to: '/admin/wizyty', label: 'Wizyty', icon: ClipboardList },
-  { to: '/admin/uslugi', label: 'Usługi', icon: Scissors },
-  { to: '/admin/pracownicy', label: 'Pracownicy', icon: Users },
+const allLinks = [
+  { to: '/admin', label: 'Dashboard', icon: LayoutDashboard, roles: ['admin', 'pracownik'] },
+  { to: '/admin/kalendarz', label: 'Kalendarz', icon: Calendar, roles: ['admin', 'pracownik'] },
+  { to: '/admin/wizyty', label: 'Wizyty', icon: ClipboardList, roles: ['admin'] },
+  { to: '/admin/klienci', label: 'Klienci', icon: UserCheck, roles: ['admin'] },
+  { to: '/admin/uslugi', label: 'Usługi', icon: Scissors, roles: ['admin'] },
+  { to: '/admin/pracownicy', label: 'Pracownicy', icon: Users, roles: ['admin'] },
 ];
 
 export function AdminLayout() {
