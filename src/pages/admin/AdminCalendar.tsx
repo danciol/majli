@@ -31,6 +31,7 @@ const AdminCalendar = () => {
   const { appointments, loading: loadingA, addAppointment, updateAppointment, deleteAppointment } = useAppointments();
   const { services, loading: loadingS } = useServices();
   const { employees, loading: loadingE } = useEmployees();
+  const { employee: currentUser } = useAuth();
   const [showImportDialog, setShowImportDialog] = useState(false);
   const [pendingImport, setPendingImport] = useState<Partial<Appointment>[]>([]);
   const [selectedEmployeeId, setSelectedEmployeeId] = useState('');
@@ -40,6 +41,27 @@ const AdminCalendar = () => {
   const [apptDialogOpen, setApptDialogOpen] = useState(false);
   const [editingAppointment, setEditingAppointment] = useState<Appointment | null>(null);
   const [newApptDate, setNewApptDate] = useState<Date | null>(null);
+
+  // Filter by selected visible employee
+  const [filterEmployeeId, setFilterEmployeeId] = useState<string>('all');
+
+  const isAdmin = currentUser?.role === 'admin';
+
+  // Which employees this user can see
+  const visibleEmployees = isAdmin
+    ? employees
+    : employees.filter(e =>
+        e.id === currentUser?.id ||
+        (currentUser?.canViewCalendars || []).includes(e.id)
+      );
+
+  // Filter appointments
+  const filteredAppointments = appointments.filter(a => {
+    const visibleIds = visibleEmployees.map(e => e.id);
+    if (!visibleIds.includes(a.employeeId)) return false;
+    if (filterEmployeeId !== 'all' && a.employeeId !== filterEmployeeId) return false;
+    return true;
+  });
 
   const loading = loadingA || loadingS || loadingE;
   const weekStart = startOfWeek(currentDate, { weekStartsOn: 1 });
