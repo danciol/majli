@@ -235,7 +235,7 @@ const AdminCalendar = () => {
                 {hour}:00
               </div>
               {weekDays.map((day) => {
-                const dayAppts = appointments.filter((a) => {
+                const dayAppts = filteredAppointments.filter((a) => {
                   const aDate = new Date(a.date);
                   return isSameDay(aDate, day) && aDate.getHours() === hour;
                 });
