@@ -249,6 +249,31 @@ const AdminEmployees = () => {
               />
             </div>
 
+            {form.role === 'pracownik' && (
+              <div>
+                <Label className="mb-2 block">Widoczność kalendarzy</Label>
+                <p className="text-xs text-muted-foreground mb-2">Wybierz których pracowników kalendarze może przeglądać</p>
+                <div className="space-y-2">
+                  {employees.filter(e => e.id !== editing?.id).map(emp => (
+                    <label key={emp.id} className="flex items-center gap-2 text-sm cursor-pointer">
+                      <Checkbox
+                        checked={form.canViewCalendars.includes(emp.id)}
+                        onCheckedChange={(checked) => {
+                          setForm(f => ({
+                            ...f,
+                            canViewCalendars: checked
+                              ? [...f.canViewCalendars, emp.id]
+                              : f.canViewCalendars.filter(id => id !== emp.id)
+                          }));
+                        }}
+                      />
+                      {emp.name}
+                    </label>
+                  ))}
+                </div>
+              </div>
+            )}
+
             <Button onClick={handleSave} className="w-full bg-primary text-primary-foreground">
               {editing ? 'Zapisz' : 'Dodaj'}
             </Button>
