@@ -99,3 +99,19 @@ export function useAppointments() {
 
   return { appointments: data, loading, addAppointment, updateAppointment, deleteAppointment };
 }
+
+// --- Clients ---
+export function useClients() {
+  const { data, loading } = useCollection<Client>('clients');
+
+  const addClient = async (client: Omit<Client, 'id'>) => {
+    await addDoc(collection(db, 'clients'), client);
+  };
+
+  const updateClient = async (id: string, updates: Partial<Client>) => {
+    const { id: _, ...rest } = updates as Client;
+    await updateDoc(doc(db, 'clients', id), rest);
+  };
+
+  return { clients: data, loading, addClient, updateClient };
+}
