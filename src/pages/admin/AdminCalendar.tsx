@@ -10,6 +10,10 @@ import { toast } from 'sonner';
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription,
 } from '@/components/ui/dialog';
+import {
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+} from '@/components/ui/select';
+import { Label } from '@/components/ui/label';
 import AppointmentDialog from '@/components/admin/AppointmentDialog';
 
 const hours = Array.from({ length: 13 }, (_, i) => i + 8);
@@ -28,6 +32,8 @@ const AdminCalendar = () => {
   const { employees, loading: loadingE } = useEmployees();
   const [showImportDialog, setShowImportDialog] = useState(false);
   const [pendingImport, setPendingImport] = useState<Partial<Appointment>[]>([]);
+  const [selectedEmployeeId, setSelectedEmployeeId] = useState('');
+  const [rawIcsText, setRawIcsText] = useState('');
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [apptDialogOpen, setApptDialogOpen] = useState(false);
@@ -44,33 +50,52 @@ const AdminCalendar = () => {
     if (!file.name.endsWith('.ics')) { toast.error('Wybierz plik w formacie .ics'); return; }
     try {
       const text = await file.text();
-      const events = parseICSFile(text);
-      if (events.length === 0) { toast.error('Nie znaleziono wydarzeń w pliku'); return; }
-      const existingUIDs = new Set(appointments.map(a => a.googleCalendarEventId).filter(Boolean));
-      const newEvents = events.filter(e => !e.googleCalendarEventId || !existingUIDs.has(e.googleCalendarEventId));
-      if (newEvents.length === 0) { toast.info('Wszystkie wydarzenia już istnieją'); return; }
-      setPendingImport(newEvents);
+      setRawIcsText(text);
+      // Show employee selection dialog first
+      setSelectedEmployeeId(employees.length > 0 ? employees[0].id : '');
       setShowImportDialog(true);
+      // Parse with default employee for preview
+      const events = parseICSFile(text, services, employees.length > 0 ? employees[0].id : '');
+      if (events.length === 0) { toast.error('Nie znaleziono wydarzeń w pliku'); setShowImportDialog(false); return; }
+      const existingUIDs = new Set(appointments.map(a => a.googleCalendarEventId).filter(Boolean));
+      const newEvents = events.filter(ev => !ev.googleCalendarEventId || !existingUIDs.has(ev.googleCalendarEventId));
+      if (newEvents.length === 0) { toast.info('Wszystkie wydarzenia już istnieją'); setShowImportDialog(false); return; }
+      setPendingImport(newEvents);
     } catch { toast.error('Błąd podczas odczytywania pliku'); }
     if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
+  const handleEmployeeChange = (empId: string) => {
+    setSelectedEmployeeId(empId);
+    // Re-parse with new employee
+    if (rawIcsText) {
+      const events = parseICSFile(rawIcsText, services, empId);
+      const existingUIDs = new Set(appointments.map(a => a.googleCalendarEventId).filter(Boolean));
+      const newEvents = events.filter(ev => !ev.googleCalendarEventId || !existingUIDs.has(ev.googleCalendarEventId));
+      setPendingImport(newEvents);
+    }
+  };
+
   const confirmImport = async () => {
+    if (!selectedEmployeeId) { toast.error('Wybierz pracownika'); return; }
     try {
+      let imported = 0;
       for (const p of pendingImport) {
         await addAppointment({
-          serviceId: p.serviceId || '', employeeId: p.employeeId || '',
-          clientName: p.clientName || 'Wydarzenie', clientPhone: p.clientPhone || '',
+          serviceId: p.serviceId || '', employeeId: selectedEmployeeId,
+          clientName: p.clientName || 'Klient', clientPhone: p.clientPhone || '',
           clientEmail: p.clientEmail || '', date: p.date || new Date().toISOString(),
           duration: p.duration || 60, status: (p.status as Appointment['status']) || 'confirmed',
           googleCalendarEventId: p.googleCalendarEventId,
           notes: p.notes,
           createdAt: p.createdAt || new Date().toISOString(),
         });
+        imported++;
       }
       setPendingImport([]);
       setShowImportDialog(false);
-      toast.success(`Zaimportowano ${pendingImport.length} wydarzeń`);
+      setRawIcsText('');
+      toast.success(`Zaimportowano ${imported} wydarzeń`);
     } catch { toast.error('Błąd importu'); }
   };
 
@@ -228,33 +253,65 @@ const AdminCalendar = () => {
       />
 
       <Dialog open={showImportDialog} onOpenChange={setShowImportDialog}>
-        <DialogContent className="max-w-md">
+        <DialogContent className="max-w-lg max-h-[85vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <FileUp className="w-5 h-5 text-primary" />
               Import kalendarza
             </DialogTitle>
             <DialogDescription>
-              Znaleziono {pendingImport.length} wydarzeń do zaimportowania
+              Wybierz pracownika i zaimportuj wydarzenia
             </DialogDescription>
           </DialogHeader>
-          <div className="max-h-[300px] overflow-y-auto space-y-2">
-            {pendingImport.map((event, i) => (
-              <div key={i} className="flex items-start gap-3 p-3 rounded-lg bg-secondary/50 text-sm">
-                <CheckCircle2 className="w-4 h-4 text-primary mt-0.5 shrink-0" />
-                <div className="min-w-0">
-                  <p className="font-medium text-foreground truncate">{event.clientName}</p>
-                  <p className="text-xs text-muted-foreground">
-                    {event.date && format(new Date(event.date), 'EEEE, d MMMM yyyy · HH:mm', { locale: pl })}
-                    {' · '}{event.duration} min
-                  </p>
-                </div>
+
+          <div className="space-y-4">
+            <div>
+              <Label className="mb-1.5 block">Pracownik</Label>
+              <Select value={selectedEmployeeId} onValueChange={handleEmployeeChange}>
+                <SelectTrigger><SelectValue placeholder="Wybierz pracownika" /></SelectTrigger>
+                <SelectContent>
+                  {employees.map(emp => (
+                    <SelectItem key={emp.id} value={emp.id}>{emp.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div>
+              <p className="text-sm font-medium mb-2">
+                Znaleziono {pendingImport.length} wydarzeń do zaimportowania
+              </p>
+              <div className="max-h-[250px] overflow-y-auto space-y-2">
+                {pendingImport.map((event, i) => {
+                  const matchedService = services.find(s => s.id === event.serviceId);
+                  return (
+                    <div key={i} className="flex items-start gap-3 p-3 rounded-lg bg-secondary/50 text-sm">
+                      <CheckCircle2 className="w-4 h-4 text-primary mt-0.5 shrink-0" />
+                      <div className="min-w-0 flex-1">
+                        <p className="font-medium text-foreground">{event.clientName}</p>
+                        {event.clientPhone && (
+                          <p className="text-xs text-muted-foreground">📞 {event.clientPhone}</p>
+                        )}
+                        {matchedService && (
+                          <p className="text-xs text-primary/80">💅 {matchedService.name}</p>
+                        )}
+                        <p className="text-xs text-muted-foreground">
+                          {event.date && format(new Date(event.date), 'EEEE, d MMMM yyyy · HH:mm', { locale: pl })}
+                          {' · '}{event.duration} min
+                        </p>
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
-            ))}
+            </div>
           </div>
+
           <div className="flex gap-2 justify-end">
-            <Button variant="outline" onClick={() => setShowImportDialog(false)}>Anuluj</Button>
-            <Button onClick={confirmImport}>Importuj {pendingImport.length} wydarzeń</Button>
+            <Button variant="outline" onClick={() => { setShowImportDialog(false); setRawIcsText(''); }}>Anuluj</Button>
+            <Button onClick={confirmImport} disabled={!selectedEmployeeId}>
+              Importuj {pendingImport.length} wydarzeń
+            </Button>
           </div>
         </DialogContent>
       </Dialog>
