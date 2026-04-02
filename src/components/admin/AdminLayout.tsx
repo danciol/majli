@@ -23,6 +23,9 @@ export function AdminLayout() {
   if (loading) return <div className="min-h-screen flex items-center justify-center"><span className="text-muted-foreground">Ładowanie...</span></div>;
   if (!isAuthenticated) return <Navigate to="/admin/login" replace />;
 
+  const role = employee?.role || 'pracownik';
+  const links = allLinks.filter(l => l.roles.includes(role));
+
   const handleLogout = () => {
     logout();
     navigate('/admin/login');
