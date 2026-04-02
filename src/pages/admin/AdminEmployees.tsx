@@ -102,6 +102,7 @@ const AdminEmployees = () => {
         password: form.password,
         workingHours: form.workingHours,
         daysOff,
+        canViewCalendars: form.canViewCalendars,
       };
       if (editing) {
         await updateEmployee(editing.id, data as Partial<Employee>);
