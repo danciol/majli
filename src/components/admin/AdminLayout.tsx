@@ -16,7 +16,7 @@ const links = [
 export function AdminLayout() {
   const location = useLocation();
   const navigate = useNavigate();
-  const { isAuthenticated, user, logout, loading } = useAuth();
+  const { isAuthenticated, employee, logout, loading } = useAuth();
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
   if (loading) return <div className="min-h-screen flex items-center justify-center"><span className="text-muted-foreground">Ładowanie...</span></div>;
