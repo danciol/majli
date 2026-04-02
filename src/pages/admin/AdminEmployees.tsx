@@ -63,7 +63,7 @@ const AdminEmployees = () => {
     setEditing(null);
     setForm({
       name: '', role: 'pracownik', login: '', password: '',
-      workingHours: { ...defaultWorkingHours }, daysOff: '',
+      workingHours: { ...defaultWorkingHours }, daysOff: '', canViewCalendars: [],
     });
     setDialogOpen(true);
   };
