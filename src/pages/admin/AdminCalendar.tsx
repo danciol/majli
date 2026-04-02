@@ -174,11 +174,26 @@ const AdminCalendar = () => {
           <h1 className="font-heading text-2xl font-bold">Kalendarz</h1>
           <Button variant="outline" size="sm" onClick={goToToday}>Dziś</Button>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
+          {visibleEmployees.length > 1 && (
+            <Select value={filterEmployeeId} onValueChange={setFilterEmployeeId}>
+              <SelectTrigger className="w-[180px] h-8 text-sm">
+                <SelectValue placeholder="Wszyscy" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Wszyscy pracownicy</SelectItem>
+                {visibleEmployees.map(e => (
+                  <SelectItem key={e.id} value={e.id}>{e.name}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          )}
           <input ref={fileInputRef} type="file" accept=".ics" onChange={handleFileUpload} className="hidden" />
-          <Button variant="outline" size="sm" onClick={() => fileInputRef.current?.click()} className="gap-2">
-            <Upload className="w-4 h-4" /> Importuj .ics
-          </Button>
+          {isAdmin && (
+            <Button variant="outline" size="sm" onClick={() => fileInputRef.current?.click()} className="gap-2">
+              <Upload className="w-4 h-4" /> Importuj .ics
+            </Button>
+          )}
           <div className="flex items-center gap-1 ml-2">
             <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setCurrentDate(d => addDays(d, -7))}>
               <ChevronLeft className="w-4 h-4" />
