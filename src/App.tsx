@@ -12,6 +12,7 @@ import AdminCalendar from "./pages/admin/AdminCalendar";
 import AdminServices from "./pages/admin/AdminServices";
 import AdminEmployees from "./pages/admin/AdminEmployees";
 import AdminAppointments from "./pages/admin/AdminAppointments";
+import AdminClients from "./pages/admin/AdminClients";
 import { AdminLayout } from "./components/admin/AdminLayout";
 
 const queryClient = new QueryClient();
@@ -30,6 +31,7 @@ const App = () => (
               <Route index element={<AdminDashboard />} />
               <Route path="kalendarz" element={<AdminCalendar />} />
               <Route path="wizyty" element={<AdminAppointments />} />
+              <Route path="klienci" element={<AdminClients />} />
               <Route path="uslugi" element={<AdminServices />} />
               <Route path="pracownicy" element={<AdminEmployees />} />
             </Route>

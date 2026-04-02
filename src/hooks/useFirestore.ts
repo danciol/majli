@@ -11,7 +11,7 @@ import {
   QueryConstraint,
 } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
-import type { Service, Employee, Appointment } from '@/data/services';
+import type { Service, Employee, Appointment, Client } from '@/data/services';
 
 // Generic hook for real-time Firestore collection
 function useCollection<T extends { id: string }>(
@@ -98,4 +98,20 @@ export function useAppointments() {
   };
 
   return { appointments: data, loading, addAppointment, updateAppointment, deleteAppointment };
+}
+
+// --- Clients ---
+export function useClients() {
+  const { data, loading } = useCollection<Client>('clients');
+
+  const addClient = async (client: Omit<Client, 'id'>) => {
+    await addDoc(collection(db, 'clients'), client);
+  };
+
+  const updateClient = async (id: string, updates: Partial<Client>) => {
+    const { id: _, ...rest } = updates as Client;
+    await updateDoc(doc(db, 'clients', id), rest);
+  };
+
+  return { clients: data, loading, addClient, updateClient };
 }

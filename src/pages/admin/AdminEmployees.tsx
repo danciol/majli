@@ -2,6 +2,7 @@ import { useState } from 'react';
 import type { Employee } from '@/data/services';
 import { useEmployees } from '@/hooks/useFirestore';
 import { Plus, Edit2, Trash2, User, Loader2 } from 'lucide-react';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -37,6 +38,7 @@ interface EmployeeForm {
   password: string;
   workingHours: Record<string, string>;
   daysOff: string;
+  canViewCalendars: string[];
 }
 
 const defaultWorkingHours: Record<string, string> = {
@@ -55,14 +57,14 @@ const AdminEmployees = () => {
   const [editing, setEditing] = useState<Employee | null>(null);
   const [form, setForm] = useState<EmployeeForm>({
     name: '', role: 'pracownik', login: '', password: '',
-    workingHours: { ...defaultWorkingHours }, daysOff: '',
+    workingHours: { ...defaultWorkingHours }, daysOff: '', canViewCalendars: [],
   });
 
   const openNew = () => {
     setEditing(null);
     setForm({
       name: '', role: 'pracownik', login: '', password: '',
-      workingHours: { ...defaultWorkingHours }, daysOff: '',
+      workingHours: { ...defaultWorkingHours }, daysOff: '', canViewCalendars: [],
     });
     setDialogOpen(true);
   };
@@ -81,6 +83,7 @@ const AdminEmployees = () => {
       password: e.password || '',
       workingHours: wh,
       daysOff: (e.daysOff || []).join(', '),
+      canViewCalendars: e.canViewCalendars || [],
     });
     setDialogOpen(true);
   };
@@ -100,6 +103,7 @@ const AdminEmployees = () => {
         password: form.password,
         workingHours: form.workingHours,
         daysOff,
+        canViewCalendars: form.canViewCalendars,
       };
       if (editing) {
         await updateEmployee(editing.id, data as Partial<Employee>);
@@ -244,6 +248,31 @@ const AdminEmployees = () => {
                 placeholder="2026-04-11, 2026-04-25"
               />
             </div>
+
+            {form.role === 'pracownik' && (
+              <div>
+                <Label className="mb-2 block">Widoczność kalendarzy</Label>
+                <p className="text-xs text-muted-foreground mb-2">Wybierz których pracowników kalendarze może przeglądać</p>
+                <div className="space-y-2">
+                  {employees.filter(e => e.id !== editing?.id).map(emp => (
+                    <label key={emp.id} className="flex items-center gap-2 text-sm cursor-pointer">
+                      <Checkbox
+                        checked={form.canViewCalendars.includes(emp.id)}
+                        onCheckedChange={(checked) => {
+                          setForm(f => ({
+                            ...f,
+                            canViewCalendars: checked
+                              ? [...f.canViewCalendars, emp.id]
+                              : f.canViewCalendars.filter(id => id !== emp.id)
+                          }));
+                        }}
+                      />
+                      {emp.name}
+                    </label>
+                  ))}
+                </div>
+              </div>
+            )}
 
             <Button onClick={handleSave} className="w-full bg-primary text-primary-foreground">
               {editing ? 'Zapisz' : 'Dodaj'}

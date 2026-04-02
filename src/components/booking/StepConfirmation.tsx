@@ -1,6 +1,11 @@
-import { CheckCircle2, Calendar, Clock, User, Mail, Phone } from 'lucide-react';
+import { useState } from 'react';
+import { CheckCircle2, Calendar, Clock, User, Mail, Phone, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { BookingData } from './BookingWizard';
+import { useAppointments, useClients } from '@/hooks/useFirestore';
+import { toast } from 'sonner';
+import { collection, query, where, getDocs } from 'firebase/firestore';
+import { db } from '@/lib/firebase';
 
 interface Props {
   booking: BookingData;
@@ -8,14 +13,62 @@ interface Props {
 }
 
 export function StepConfirmation({ booking, onClose }: Props) {
+  const { addAppointment } = useAppointments();
+  const { addClient } = useClients();
+  const [saving, setSaving] = useState(false);
+  const [saved, setSaved] = useState(false);
+
+  const handleConfirm = async () => {
+    if (!booking.service || !booking.employee || !booking.date || !booking.time) return;
+    setSaving(true);
+    try {
+      const [hours, minutes] = booking.time.split(':').map(Number);
+      const dateObj = new Date(booking.date);
+      dateObj.setHours(hours, minutes, 0, 0);
+
+      await addAppointment({
+        serviceId: booking.service.id,
+        employeeId: booking.employee.id,
+        clientName: booking.clientName,
+        clientPhone: booking.clientPhone,
+        clientEmail: booking.clientEmail,
+        date: dateObj.toISOString(),
+        duration: booking.service.duration,
+        status: 'pending',
+        createdAt: new Date().toISOString(),
+      });
+
+      // Add or update client
+      const clientsSnap = await getDocs(
+        query(collection(db, 'clients'), where('phone', '==', booking.clientPhone))
+      );
+      if (clientsSnap.empty) {
+        await addClient({
+          name: booking.clientName,
+          phone: booking.clientPhone,
+          email: booking.clientEmail,
+          appointmentIds: [],
+        });
+      }
+
+      setSaved(true);
+      toast.success('Wizyta zarezerwowana!');
+    } catch {
+      toast.error('Błąd rezerwacji. Spróbuj ponownie.');
+    }
+    setSaving(false);
+  };
+
   return (
     <div className="text-center">
       <div className="w-16 h-16 mx-auto rounded-full bg-primary/10 flex items-center justify-center mb-4">
         <CheckCircle2 className="w-8 h-8 text-primary" />
       </div>
-      <h3 className="font-heading text-xl font-semibold text-foreground mb-1">Rezerwacja potwierdzona!</h3>
+      <h3 className="font-heading text-xl font-semibold text-foreground mb-1">
+        {saved ? 'Rezerwacja potwierdzona!' : 'Potwierdzenie rezerwacji'}
+      </h3>
       <p className="text-sm text-muted-foreground mb-6">
-        Potwierdzenie zostanie wysłane na Twój adres email
+        {saved ? 'Potwierdzenie zostanie wysłane na Twój adres email' : 'Sprawdź dane i potwierdź rezerwację'}
       </p>
 
       <div className="bg-secondary/50 rounded-xl p-5 text-left space-y-3 mb-6">
@@ -57,9 +110,15 @@ export function StepConfirmation({ booking, onClose }: Props) {
         </div>
       </div>
 
-      <Button onClick={onClose} className="w-full bg-primary text-primary-foreground font-semibold">
-        Zamknij
-      </Button>
+      {saved ? (
+        <Button onClick={onClose} className="w-full bg-primary text-primary-foreground font-semibold">
+          Zamknij
+        </Button>
+      ) : (
+        <Button onClick={handleConfirm} disabled={saving} className="w-full bg-primary text-primary-foreground font-semibold">
+          {saving ? <><Loader2 className="w-4 h-4 animate-spin mr-2" /> Rezerwuję...</> : 'Potwierdź rezerwację'}
+        </Button>
+      )}
     </div>
   );
 }

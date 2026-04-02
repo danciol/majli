@@ -5,6 +5,7 @@ import { ChevronLeft, ChevronRight, Upload, FileUp, CheckCircle2, Plus, Loader2 
 import { Button } from '@/components/ui/button';
 import { Appointment } from '@/data/services';
 import { useAppointments, useServices, useEmployees } from '@/hooks/useFirestore';
+import { useAuth } from '@/contexts/AuthContext';
 import { parseICSFile } from '@/lib/icsParser';
 import { toast } from 'sonner';
 import {
@@ -30,6 +31,7 @@ const AdminCalendar = () => {
   const { appointments, loading: loadingA, addAppointment, updateAppointment, deleteAppointment } = useAppointments();
   const { services, loading: loadingS } = useServices();
   const { employees, loading: loadingE } = useEmployees();
+  const { employee: currentUser } = useAuth();
   const [showImportDialog, setShowImportDialog] = useState(false);
   const [pendingImport, setPendingImport] = useState<Partial<Appointment>[]>([]);
   const [selectedEmployeeId, setSelectedEmployeeId] = useState('');
@@ -39,6 +41,27 @@ const AdminCalendar = () => {
   const [apptDialogOpen, setApptDialogOpen] = useState(false);
   const [editingAppointment, setEditingAppointment] = useState<Appointment | null>(null);
   const [newApptDate, setNewApptDate] = useState<Date | null>(null);
+
+  // Filter by selected visible employee
+  const [filterEmployeeId, setFilterEmployeeId] = useState<string>('all');
+
+  const isAdmin = currentUser?.role === 'admin';
+
+  // Which employees this user can see
+  const visibleEmployees = isAdmin
+    ? employees
+    : employees.filter(e =>
+        e.id === currentUser?.id ||
+        (currentUser?.canViewCalendars || []).includes(e.id)
+      );
+
+  // Filter appointments
+  const filteredAppointments = appointments.filter(a => {
+    const visibleIds = visibleEmployees.map(e => e.id);
+    if (!visibleIds.includes(a.employeeId)) return false;
+    if (filterEmployeeId !== 'all' && a.employeeId !== filterEmployeeId) return false;
+    return true;
+  });
 
   const loading = loadingA || loadingS || loadingE;
   const weekStart = startOfWeek(currentDate, { weekStartsOn: 1 });
@@ -151,11 +174,26 @@ const AdminCalendar = () => {
           <h1 className="font-heading text-2xl font-bold">Kalendarz</h1>
           <Button variant="outline" size="sm" onClick={goToToday}>Dziś</Button>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
+          {visibleEmployees.length > 1 && (
+            <Select value={filterEmployeeId} onValueChange={setFilterEmployeeId}>
+              <SelectTrigger className="w-[180px] h-8 text-sm">
+                <SelectValue placeholder="Wszyscy" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Wszyscy pracownicy</SelectItem>
+                {visibleEmployees.map(e => (
+                  <SelectItem key={e.id} value={e.id}>{e.name}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          )}
           <input ref={fileInputRef} type="file" accept=".ics" onChange={handleFileUpload} className="hidden" />
-          <Button variant="outline" size="sm" onClick={() => fileInputRef.current?.click()} className="gap-2">
-            <Upload className="w-4 h-4" /> Importuj .ics
-          </Button>
+          {isAdmin && (
+            <Button variant="outline" size="sm" onClick={() => fileInputRef.current?.click()} className="gap-2">
+              <Upload className="w-4 h-4" /> Importuj .ics
+            </Button>
+          )}
           <div className="flex items-center gap-1 ml-2">
             <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setCurrentDate(d => addDays(d, -7))}>
               <ChevronLeft className="w-4 h-4" />
@@ -197,7 +235,7 @@ const AdminCalendar = () => {
                 {hour}:00
               </div>
               {weekDays.map((day) => {
-                const dayAppts = appointments.filter((a) => {
+                const dayAppts = filteredAppointments.filter((a) => {
                   const aDate = new Date(a.date);
                   return isSameDay(aDate, day) && aDate.getHours() === hour;
                 });
