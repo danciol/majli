@@ -82,6 +82,7 @@ const AdminEmployees = () => {
       password: e.password || '',
       workingHours: wh,
       daysOff: (e.daysOff || []).join(', '),
+      canViewCalendars: e.canViewCalendars || [],
     });
     setDialogOpen(true);
   };
