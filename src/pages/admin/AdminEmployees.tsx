@@ -37,6 +37,7 @@ interface EmployeeForm {
   password: string;
   workingHours: Record<string, string>;
   daysOff: string;
+  canViewCalendars: string[];
 }
 
 const defaultWorkingHours: Record<string, string> = {
