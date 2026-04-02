@@ -5,6 +5,7 @@ import { ChevronLeft, ChevronRight, Upload, FileUp, CheckCircle2, Plus, Loader2 
 import { Button } from '@/components/ui/button';
 import { Appointment } from '@/data/services';
 import { useAppointments, useServices, useEmployees } from '@/hooks/useFirestore';
+import { useAuth } from '@/contexts/AuthContext';
 import { parseICSFile } from '@/lib/icsParser';
 import { toast } from 'sonner';
 import {
