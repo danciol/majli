@@ -81,15 +81,20 @@ const AdminCalendar = () => {
     try {
       let imported = 0;
       for (const p of pendingImport) {
-        await addAppointment({
-          serviceId: p.serviceId || '', employeeId: selectedEmployeeId,
-          clientName: p.clientName || 'Klient', clientPhone: p.clientPhone || '',
-          clientEmail: p.clientEmail || '', date: p.date || new Date().toISOString(),
-          duration: p.duration || 60, status: (p.status as Appointment['status']) || 'confirmed',
-          googleCalendarEventId: p.googleCalendarEventId,
-          notes: p.notes,
+        const apptData: Omit<Appointment, 'id'> = {
+          serviceId: p.serviceId || '',
+          employeeId: selectedEmployeeId,
+          clientName: p.clientName || 'Klient',
+          clientPhone: p.clientPhone || '',
+          clientEmail: p.clientEmail || '',
+          date: p.date || new Date().toISOString(),
+          duration: p.duration || 60,
+          status: (p.status as Appointment['status']) || 'confirmed',
           createdAt: p.createdAt || new Date().toISOString(),
-        });
+        };
+        if (p.googleCalendarEventId) apptData.googleCalendarEventId = p.googleCalendarEventId;
+        if (p.notes) apptData.notes = p.notes;
+        await addAppointment(apptData);
         imported++;
       }
       setPendingImport([]);
