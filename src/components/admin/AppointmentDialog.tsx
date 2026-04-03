@@ -72,7 +72,7 @@ const AppointmentDialog = ({
   const handleSave = () => {
     const dateTime = new Date(`${date}T${time}`);
 
-    onSave({
+    const data: Appointment = {
       id: appointment?.id || 'new-' + Date.now(),
       serviceId,
       employeeId,
@@ -82,10 +82,12 @@ const AppointmentDialog = ({
       date: dateTime.toISOString(),
       duration: selectedService?.duration || duration,
       status,
-      notes: notes || undefined,
-      googleCalendarEventId: appointment?.googleCalendarEventId,
       createdAt: appointment?.createdAt || new Date().toISOString(),
-    });
+    };
+    if (notes) data.notes = notes;
+    if (appointment?.googleCalendarEventId) data.googleCalendarEventId = appointment.googleCalendarEventId;
+
+    onSave(data);
     onOpenChange(false);
   };
 
