@@ -67,9 +67,10 @@ const AppointmentDialog = ({
     }
   }, [appointment, defaultDate]);
 
+  const selectedService = services.find(s => s.id === serviceId);
+
   const handleSave = () => {
     const dateTime = new Date(`${date}T${time}`);
-    const selectedService = services.find(s => s.id === serviceId);
 
     onSave({
       id: appointment?.id || 'new-' + Date.now(),
@@ -88,9 +89,14 @@ const AppointmentDialog = ({
     onOpenChange(false);
   };
 
-  const availableEmployees = serviceId
-    ? employees.filter(e => e.services.includes(serviceId))
+  const matchedEmployees = serviceId
+    ? employees.filter((employee) =>
+        employee.services?.includes(serviceId) ||
+        selectedService?.employeeIds?.includes(employee.id)
+      )
     : employees;
+
+  const availableEmployees = matchedEmployees.length > 0 ? matchedEmployees : employees;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
