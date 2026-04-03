@@ -127,6 +127,21 @@ const AppointmentDialog = ({
           </div>
 
           <div className="space-y-1.5">
+            <Label>Pracownik</Label>
+            <Select value={employeeId} onValueChange={(v) => {
+              setEmployeeId(v);
+              setServiceId('');
+            }}>
+              <SelectTrigger><SelectValue placeholder="Wybierz pracownika" /></SelectTrigger>
+              <SelectContent>
+                {employees.map(e => (
+                  <SelectItem key={e.id} value={e.id}>{e.name}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="space-y-1.5">
             <Label>Usługa</Label>
             <Select value={serviceId} onValueChange={(v) => {
               setServiceId(v);
@@ -135,22 +150,10 @@ const AppointmentDialog = ({
             }}>
               <SelectTrigger><SelectValue placeholder="Wybierz usługę" /></SelectTrigger>
               <SelectContent>
-                {services.filter(s => s.active !== false).map(s => (
+                {availableServices.map(s => (
                   <SelectItem key={s.id} value={s.id}>
                     {s.name} ({s.duration} min · {s.price} zł)
                   </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-
-          <div className="space-y-1.5">
-            <Label>Pracownik</Label>
-            <Select value={employeeId} onValueChange={setEmployeeId}>
-              <SelectTrigger><SelectValue placeholder="Wybierz pracownika" /></SelectTrigger>
-              <SelectContent>
-                {availableEmployees.map(e => (
-                  <SelectItem key={e.id} value={e.id}>{e.name}</SelectItem>
                 ))}
               </SelectContent>
             </Select>
