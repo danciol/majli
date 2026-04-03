@@ -115,8 +115,14 @@ const AdminCalendar = () => {
     // Re-parse with new employee
     if (rawIcsText) {
       const events = parseICSFile(rawIcsText, services, empId);
+      const oneMonthAgo = new Date();
+      oneMonthAgo.setMonth(oneMonthAgo.getMonth() - 1);
       const existingUIDs = new Set(appointments.map(a => a.googleCalendarEventId).filter(Boolean));
-      const newEvents = events.filter(ev => !ev.googleCalendarEventId || !existingUIDs.has(ev.googleCalendarEventId));
+      const newEvents = events.filter(ev => {
+        if (ev.googleCalendarEventId && existingUIDs.has(ev.googleCalendarEventId)) return false;
+        if (ev.date && new Date(ev.date) < oneMonthAgo) return false;
+        return true;
+      });
       setPendingImport(newEvents);
     }
   };
