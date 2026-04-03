@@ -91,6 +91,13 @@ const AppointmentDialog = ({
     onOpenChange(false);
   };
 
+  const availableServices = employeeId
+    ? services.filter(s => s.active !== false && (
+        s.employeeIds?.includes(employeeId) ||
+        employees.find(e => e.id === employeeId)?.services?.includes(s.id)
+      ))
+    : services.filter(s => s.active !== false);
+
   const matchedEmployees = serviceId
     ? employees.filter((employee) =>
         employee.services?.includes(serviceId) ||

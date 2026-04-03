@@ -292,11 +292,11 @@ const AdminCalendar = () => {
                           style={{ minHeight: `${heightBlocks * 48}px` }}
                           title={`${a.clientName}${service ? ` – ${service.name}` : ''}${a.notes ? `\n${a.notes}` : ''}`}
                         >
-                          <p className="font-semibold truncate leading-tight">
-                            {service?.name || a.clientName}
+                          <p className="font-bold truncate leading-tight">
+                            {a.clientName}
                           </p>
                           <p className="truncate opacity-70 leading-tight">
-                            {format(new Date(a.date), 'HH:mm')} · {a.clientName}
+                            {format(new Date(a.date), 'HH:mm')} · {service?.name || 'Wizyta'}
                           </p>
                           {a.clientPhone && (
                             <p className="truncate opacity-70 leading-tight">📞 {a.clientPhone}</p>
