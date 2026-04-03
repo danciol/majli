@@ -120,7 +120,7 @@ const AppointmentDialog = ({
             }}>
               <SelectTrigger><SelectValue placeholder="Wybierz usługę" /></SelectTrigger>
               <SelectContent>
-                {services.filter(s => s.active).map(s => (
+                {services.filter(s => s.active !== false).map(s => (
                   <SelectItem key={s.id} value={s.id}>
                     {s.name} ({s.duration} min · {s.price} zł)
                   </SelectItem>
