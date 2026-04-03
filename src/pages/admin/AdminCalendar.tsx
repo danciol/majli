@@ -96,9 +96,15 @@ const AdminCalendar = () => {
       // Parse with default employee for preview
       const events = parseICSFile(text, services, employees.length > 0 ? employees[0].id : '');
       if (events.length === 0) { toast.error('Nie znaleziono wydarzeń w pliku'); setShowImportDialog(false); return; }
+      const oneMonthAgo = new Date();
+      oneMonthAgo.setMonth(oneMonthAgo.getMonth() - 1);
       const existingUIDs = new Set(appointments.map(a => a.googleCalendarEventId).filter(Boolean));
-      const newEvents = events.filter(ev => !ev.googleCalendarEventId || !existingUIDs.has(ev.googleCalendarEventId));
-      if (newEvents.length === 0) { toast.info('Wszystkie wydarzenia już istnieją'); setShowImportDialog(false); return; }
+      const newEvents = events.filter(ev => {
+        if (ev.googleCalendarEventId && existingUIDs.has(ev.googleCalendarEventId)) return false;
+        if (ev.date && new Date(ev.date) < oneMonthAgo) return false;
+        return true;
+      });
+      if (newEvents.length === 0) { toast.info('Brak nowych wydarzeń (starsze niż miesiąc pominięte)'); setShowImportDialog(false); return; }
       setPendingImport(newEvents);
     } catch { toast.error('Błąd podczas odczytywania pliku'); }
     if (fileInputRef.current) fileInputRef.current.value = '';
