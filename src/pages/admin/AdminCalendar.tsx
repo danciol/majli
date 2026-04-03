@@ -270,13 +270,13 @@ const AdminCalendar = () => {
                       const service = services.find(s => s.id === a.serviceId);
                       const employee = employees.find(e => e.id === a.employeeId);
                       const heightBlocks = Math.max(1, Math.ceil(a.duration / 60));
-                      const colorClass = statusColors[a.status] || statusColors.confirmed;
+                      const empColor = getEmployeeColor(a.employeeId, employees);
 
                       return (
                         <div
                           key={a.id}
                           onClick={(e) => handleAppointmentClick(e, a)}
-                          className={`relative z-10 rounded-md px-2 py-1 text-xs cursor-pointer border-l-[3px] mb-0.5 transition-all hover:shadow-md ${colorClass}`}
+                          className={`relative z-10 rounded-md px-2 py-1 text-xs cursor-pointer border-l-[3px] mb-0.5 transition-all hover:shadow-md ${empColor.bg} ${empColor.border} ${empColor.text}`}
                           style={{ minHeight: `${heightBlocks * 48}px` }}
                           title={`${a.clientName}${service ? ` – ${service.name}` : ''}${a.notes ? `\n${a.notes}` : ''}`}
                         >
@@ -286,6 +286,12 @@ const AdminCalendar = () => {
                           <p className="truncate opacity-70 leading-tight">
                             {format(new Date(a.date), 'HH:mm')} · {a.clientName}
                           </p>
+                          {a.clientPhone && (
+                            <p className="truncate opacity-70 leading-tight">📞 {a.clientPhone}</p>
+                          )}
+                          {a.notes && (
+                            <p className="truncate opacity-60 leading-tight italic">📝 {a.notes}</p>
+                          )}
                           {employee && (
                             <p className="truncate opacity-50 leading-tight">{employee.name}</p>
                           )}
