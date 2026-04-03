@@ -26,6 +26,22 @@ const statusColors: Record<string, string> = {
   completed: 'bg-green-500/15 border-green-500 text-green-700',
 };
 
+const employeeColors = [
+  { bg: 'bg-pink-100 dark:bg-pink-900/30', border: 'border-pink-400', text: 'text-pink-800 dark:text-pink-200' },
+  { bg: 'bg-blue-100 dark:bg-blue-900/30', border: 'border-blue-400', text: 'text-blue-800 dark:text-blue-200' },
+  { bg: 'bg-emerald-100 dark:bg-emerald-900/30', border: 'border-emerald-400', text: 'text-emerald-800 dark:text-emerald-200' },
+  { bg: 'bg-amber-100 dark:bg-amber-900/30', border: 'border-amber-400', text: 'text-amber-800 dark:text-amber-200' },
+  { bg: 'bg-purple-100 dark:bg-purple-900/30', border: 'border-purple-400', text: 'text-purple-800 dark:text-purple-200' },
+  { bg: 'bg-cyan-100 dark:bg-cyan-900/30', border: 'border-cyan-400', text: 'text-cyan-800 dark:text-cyan-200' },
+  { bg: 'bg-rose-100 dark:bg-rose-900/30', border: 'border-rose-400', text: 'text-rose-800 dark:text-rose-200' },
+  { bg: 'bg-indigo-100 dark:bg-indigo-900/30', border: 'border-indigo-400', text: 'text-indigo-800 dark:text-indigo-200' },
+];
+
+function getEmployeeColor(employeeId: string, employees: { id: string }[]) {
+  const idx = employees.findIndex(e => e.id === employeeId);
+  return employeeColors[idx >= 0 ? idx % employeeColors.length : 0];
+}
+
 const AdminCalendar = () => {
   const [currentDate, setCurrentDate] = useState(new Date());
   const { appointments, loading: loadingA, addAppointment, updateAppointment, deleteAppointment } = useAppointments();
@@ -80,9 +96,15 @@ const AdminCalendar = () => {
       // Parse with default employee for preview
       const events = parseICSFile(text, services, employees.length > 0 ? employees[0].id : '');
       if (events.length === 0) { toast.error('Nie znaleziono wydarzeń w pliku'); setShowImportDialog(false); return; }
+      const oneMonthAgo = new Date();
+      oneMonthAgo.setMonth(oneMonthAgo.getMonth() - 1);
       const existingUIDs = new Set(appointments.map(a => a.googleCalendarEventId).filter(Boolean));
-      const newEvents = events.filter(ev => !ev.googleCalendarEventId || !existingUIDs.has(ev.googleCalendarEventId));
-      if (newEvents.length === 0) { toast.info('Wszystkie wydarzenia już istnieją'); setShowImportDialog(false); return; }
+      const newEvents = events.filter(ev => {
+        if (ev.googleCalendarEventId && existingUIDs.has(ev.googleCalendarEventId)) return false;
+        if (ev.date && new Date(ev.date) < oneMonthAgo) return false;
+        return true;
+      });
+      if (newEvents.length === 0) { toast.info('Brak nowych wydarzeń (starsze niż miesiąc pominięte)'); setShowImportDialog(false); return; }
       setPendingImport(newEvents);
     } catch { toast.error('Błąd podczas odczytywania pliku'); }
     if (fileInputRef.current) fileInputRef.current.value = '';
@@ -93,8 +115,14 @@ const AdminCalendar = () => {
     // Re-parse with new employee
     if (rawIcsText) {
       const events = parseICSFile(rawIcsText, services, empId);
+      const oneMonthAgo = new Date();
+      oneMonthAgo.setMonth(oneMonthAgo.getMonth() - 1);
       const existingUIDs = new Set(appointments.map(a => a.googleCalendarEventId).filter(Boolean));
-      const newEvents = events.filter(ev => !ev.googleCalendarEventId || !existingUIDs.has(ev.googleCalendarEventId));
+      const newEvents = events.filter(ev => {
+        if (ev.googleCalendarEventId && existingUIDs.has(ev.googleCalendarEventId)) return false;
+        if (ev.date && new Date(ev.date) < oneMonthAgo) return false;
+        return true;
+      });
       setPendingImport(newEvents);
     }
   };
@@ -254,13 +282,13 @@ const AdminCalendar = () => {
                       const service = services.find(s => s.id === a.serviceId);
                       const employee = employees.find(e => e.id === a.employeeId);
                       const heightBlocks = Math.max(1, Math.ceil(a.duration / 60));
-                      const colorClass = statusColors[a.status] || statusColors.confirmed;
+                      const empColor = getEmployeeColor(a.employeeId, employees);
 
                       return (
                         <div
                           key={a.id}
                           onClick={(e) => handleAppointmentClick(e, a)}
-                          className={`relative z-10 rounded-md px-2 py-1 text-xs cursor-pointer border-l-[3px] mb-0.5 transition-all hover:shadow-md ${colorClass}`}
+                          className={`relative z-10 rounded-md px-2 py-1 text-xs cursor-pointer border-l-[3px] mb-0.5 transition-all hover:shadow-md ${empColor.bg} ${empColor.border} ${empColor.text}`}
                           style={{ minHeight: `${heightBlocks * 48}px` }}
                           title={`${a.clientName}${service ? ` – ${service.name}` : ''}${a.notes ? `\n${a.notes}` : ''}`}
                         >
@@ -270,6 +298,12 @@ const AdminCalendar = () => {
                           <p className="truncate opacity-70 leading-tight">
                             {format(new Date(a.date), 'HH:mm')} · {a.clientName}
                           </p>
+                          {a.clientPhone && (
+                            <p className="truncate opacity-70 leading-tight">📞 {a.clientPhone}</p>
+                          )}
+                          {a.notes && (
+                            <p className="truncate opacity-60 leading-tight italic">📝 {a.notes}</p>
+                          )}
                           {employee && (
                             <p className="truncate opacity-50 leading-tight">{employee.name}</p>
                           )}
