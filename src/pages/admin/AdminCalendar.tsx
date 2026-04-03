@@ -26,6 +26,22 @@ const statusColors: Record<string, string> = {
   completed: 'bg-green-500/15 border-green-500 text-green-700',
 };
 
+const employeeColors = [
+  { bg: 'bg-pink-100 dark:bg-pink-900/30', border: 'border-pink-400', text: 'text-pink-800 dark:text-pink-200' },
+  { bg: 'bg-blue-100 dark:bg-blue-900/30', border: 'border-blue-400', text: 'text-blue-800 dark:text-blue-200' },
+  { bg: 'bg-emerald-100 dark:bg-emerald-900/30', border: 'border-emerald-400', text: 'text-emerald-800 dark:text-emerald-200' },
+  { bg: 'bg-amber-100 dark:bg-amber-900/30', border: 'border-amber-400', text: 'text-amber-800 dark:text-amber-200' },
+  { bg: 'bg-purple-100 dark:bg-purple-900/30', border: 'border-purple-400', text: 'text-purple-800 dark:text-purple-200' },
+  { bg: 'bg-cyan-100 dark:bg-cyan-900/30', border: 'border-cyan-400', text: 'text-cyan-800 dark:text-cyan-200' },
+  { bg: 'bg-rose-100 dark:bg-rose-900/30', border: 'border-rose-400', text: 'text-rose-800 dark:text-rose-200' },
+  { bg: 'bg-indigo-100 dark:bg-indigo-900/30', border: 'border-indigo-400', text: 'text-indigo-800 dark:text-indigo-200' },
+];
+
+function getEmployeeColor(employeeId: string, employees: { id: string }[]) {
+  const idx = employees.findIndex(e => e.id === employeeId);
+  return employeeColors[idx >= 0 ? idx % employeeColors.length : 0];
+}
+
 const AdminCalendar = () => {
   const [currentDate, setCurrentDate] = useState(new Date());
   const { appointments, loading: loadingA, addAppointment, updateAppointment, deleteAppointment } = useAppointments();
