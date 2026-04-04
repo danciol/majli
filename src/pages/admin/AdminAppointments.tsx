@@ -1,50 +1,144 @@
+import { useMemo, useState } from 'react';
 import { useAppointments, useServices, useEmployees } from '@/hooks/useFirestore';
 import { format } from 'date-fns';
 import { pl } from 'date-fns/locale';
 import { Button } from '@/components/ui/button';
-import { CheckCircle, X, Loader2 } from 'lucide-react';
+import { Input } from '@/components/ui/input';
+import { NativeSelect } from '@/components/ui/native-select';
+import type { Appointment } from '@/data/services';
+import { CheckCircle, X, Loader2, Search } from 'lucide-react';
 import { toast } from 'sonner';
 
-const statusLabels: Record<string, string> = {
+const statusLabels: Record<Appointment['status'], string> = {
   pending: 'Oczekuje',
   confirmed: 'Potwierdzona',
   cancelled: 'Anulowana',
   completed: 'Zakończona',
 };
 
-const statusColors: Record<string, string> = {
-  pending: 'bg-accent/20 text-accent-foreground',
-  confirmed: 'bg-primary/15 text-primary',
-  cancelled: 'bg-destructive/15 text-destructive',
-  completed: 'bg-green-100 text-green-700',
-};
+const statusOptions: Appointment['status'][] = ['pending', 'confirmed', 'completed', 'cancelled'];
 
 const AdminAppointments = () => {
   const { appointments, loading: loadingA, updateAppointment } = useAppointments();
   const { services, loading: loadingS } = useServices();
   const { employees, loading: loadingE } = useEmployees();
+  const [search, setSearch] = useState('');
+  const [statusFilter, setStatusFilter] = useState<'all' | Appointment['status']>('all');
+  const [employeeFilter, setEmployeeFilter] = useState('all');
+  const [serviceFilter, setServiceFilter] = useState('all');
+  const [updatingId, setUpdatingId] = useState<string | null>(null);
 
   const loading = loadingA || loadingS || loadingE;
 
-  const handleConfirm = async (id: string) => {
-    try {
-      await updateAppointment(id, { status: 'confirmed' });
-      toast.success('Wizyta potwierdzona');
-    } catch { toast.error('Błąd'); }
+  const serviceMap = useMemo(
+    () => new Map(services.map((service) => [service.id, service])),
+    [services],
+  );
+
+  const employeeMap = useMemo(
+    () => new Map(employees.map((employee) => [employee.id, employee])),
+    [employees],
+  );
+
+  const filteredAppointments = useMemo(() => {
+    const query = search.trim().toLowerCase();
+
+    return [...appointments]
+      .filter((appt) => {
+        const service = serviceMap.get(appt.serviceId);
+        const employee = employeeMap.get(appt.employeeId);
+
+        if (statusFilter !== 'all' && appt.status !== statusFilter) return false;
+        if (employeeFilter !== 'all' && appt.employeeId !== employeeFilter) return false;
+        if (serviceFilter !== 'all' && appt.serviceId !== serviceFilter) return false;
+
+        if (!query) return true;
+
+        return [
+          appt.clientName,
+          appt.clientPhone,
+          appt.clientEmail,
+          service?.name || '',
+          employee?.name || '',
+        ].some((value) => value.toLowerCase().includes(query));
+      })
+      .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+  }, [appointments, employeeFilter, employeeMap, search, serviceFilter, serviceMap, statusFilter]);
+
+  const hasActiveFilters = search.trim() || statusFilter !== 'all' || employeeFilter !== 'all' || serviceFilter !== 'all';
+
+  const resetFilters = () => {
+    setSearch('');
+    setStatusFilter('all');
+    setEmployeeFilter('all');
+    setServiceFilter('all');
   };
 
-  const handleCancel = async (id: string) => {
+  const handleStatusChange = async (id: string, status: Appointment['status']) => {
+    setUpdatingId(id);
     try {
-      await updateAppointment(id, { status: 'cancelled' });
-      toast.success('Wizyta anulowana');
-    } catch { toast.error('Błąd'); }
+      await updateAppointment(id, { status });
+      toast.success(`Status zmieniony na: ${statusLabels[status].toLowerCase()}`);
+    } catch {
+      toast.error('Błąd zmiany statusu');
+    } finally {
+      setUpdatingId(null);
+    }
   };
 
   if (loading) return <div className="flex items-center justify-center py-20"><Loader2 className="w-6 h-6 animate-spin text-primary" /></div>;
 
   return (
     <div className="space-y-6">
-      <h1 className="font-heading text-2xl font-bold">Wizyty</h1>
+      <div className="flex items-start justify-between gap-3 flex-wrap">
+        <div>
+          <h1 className="font-heading text-2xl font-bold">Wizyty</h1>
+          <p className="text-sm text-muted-foreground mt-1">Wyników: {filteredAppointments.length}</p>
+        </div>
+      </div>
+
+      <div className="glass-card p-4">
+        <div className="flex flex-col gap-3 xl:flex-row xl:items-center">
+          <div className="relative w-full xl:max-w-sm">
+            <Search className="absolute left-3 top-1/2 w-4 h-4 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Szukaj po kliencie, telefonie, usłudze lub pracowniku"
+              className="pl-9"
+            />
+          </div>
+
+          <div className="grid gap-3 sm:grid-cols-2 xl:flex xl:flex-1">
+            <NativeSelect value={statusFilter} onChange={(e) => setStatusFilter(e.target.value as 'all' | Appointment['status'])} className="h-10">
+              <option value="all">Wszystkie statusy</option>
+              {statusOptions.map((status) => (
+                <option key={status} value={status}>{statusLabels[status]}</option>
+              ))}
+            </NativeSelect>
+
+            <NativeSelect value={employeeFilter} onChange={(e) => setEmployeeFilter(e.target.value)} className="h-10">
+              <option value="all">Wszyscy pracownicy</option>
+              {employees.map((employee) => (
+                <option key={employee.id} value={employee.id}>{employee.name}</option>
+              ))}
+            </NativeSelect>
+
+            <NativeSelect value={serviceFilter} onChange={(e) => setServiceFilter(e.target.value)} className="h-10 sm:col-span-2 xl:col-span-1">
+              <option value="all">Wszystkie usługi</option>
+              {services.map((service) => (
+                <option key={service.id} value={service.id}>{service.name}</option>
+              ))}
+            </NativeSelect>
+          </div>
+
+          {hasActiveFilters && (
+            <Button variant="outline" size="sm" onClick={resetFilters}>
+              Wyczyść
+            </Button>
+          )}
+        </div>
+      </div>
 
       <div className="glass-card overflow-hidden">
         <div className="overflow-x-auto">
@@ -60,9 +154,11 @@ const AdminAppointments = () => {
               </tr>
             </thead>
             <tbody>
-              {appointments.map((appt) => {
-                const service = services.find(s => s.id === appt.serviceId);
-                const employee = employees.find(e => e.id === appt.employeeId);
+              {filteredAppointments.map((appt) => {
+                const service = serviceMap.get(appt.serviceId);
+                const employee = employeeMap.get(appt.employeeId);
+                const isUpdating = updatingId === appt.id;
+
                 return (
                   <tr key={appt.id} className="border-b border-border/50 hover:bg-secondary/30 transition-colors">
                     <td className="p-3">
@@ -79,24 +175,39 @@ const AdminAppointments = () => {
                     </td>
                     <td className="p-3">{employee?.name}</td>
                     <td className="p-3">
-                      <span className={`text-xs px-3 py-1 rounded-full font-medium ${statusColors[appt.status]}`}>
-                        {statusLabels[appt.status]}
-                      </span>
+                      <div className="min-w-[160px]">
+                        <NativeSelect
+                          value={appt.status}
+                          onChange={(e) => handleStatusChange(appt.id, e.target.value as Appointment['status'])}
+                          className="h-9 py-1 pr-8 text-xs font-medium"
+                          disabled={isUpdating}
+                        >
+                          {statusOptions.map((status) => (
+                            <option key={status} value={status}>{statusLabels[status]}</option>
+                          ))}
+                        </NativeSelect>
+                      </div>
                     </td>
                     <td className="p-3 text-right">
-                      <div className="flex justify-end gap-1">
-                        <Button variant="ghost" size="icon" className="h-7 w-7" title="Potwierdź" onClick={() => handleConfirm(appt.id)}>
-                          <CheckCircle className="w-3.5 h-3.5 text-green-600" />
-                        </Button>
-                        <Button variant="ghost" size="icon" className="h-7 w-7" title="Anuluj" onClick={() => handleCancel(appt.id)}>
-                          <X className="w-3.5 h-3.5 text-destructive" />
-                        </Button>
-                      </div>
+                      {isUpdating ? (
+                        <div className="flex justify-end">
+                          <Loader2 className="w-4 h-4 animate-spin text-primary" />
+                        </div>
+                      ) : (
+                        <div className="flex justify-end gap-1">
+                          <Button variant="ghost" size="icon" className="h-7 w-7" title="Potwierdź" disabled={appt.status === 'confirmed'} onClick={() => handleStatusChange(appt.id, 'confirmed')}>
+                            <CheckCircle className="w-3.5 h-3.5 text-primary" />
+                          </Button>
+                          <Button variant="ghost" size="icon" className="h-7 w-7" title="Anuluj" disabled={appt.status === 'cancelled'} onClick={() => handleStatusChange(appt.id, 'cancelled')}>
+                            <X className="w-3.5 h-3.5 text-destructive" />
+                          </Button>
+                        </div>
+                      )}
                     </td>
                   </tr>
                 );
               })}
-              {appointments.length === 0 && (
+              {filteredAppointments.length === 0 && (
                 <tr><td colSpan={6} className="p-8 text-center text-muted-foreground">Brak wizyt</td></tr>
               )}
             </tbody>
