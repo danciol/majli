@@ -184,7 +184,7 @@ const AppointmentDialog = ({
               <Label>Status</Label>
               <Select value={status} onValueChange={(v) => setStatus(v as Appointment['status'])}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>
+                <SelectContent position="popper" className="z-[100]">
                   <SelectItem value="pending">Oczekuje</SelectItem>
                   <SelectItem value="confirmed">Potwierdzona</SelectItem>
                   <SelectItem value="completed">Zakończona</SelectItem>

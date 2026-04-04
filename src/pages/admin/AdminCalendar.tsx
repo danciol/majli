@@ -271,7 +271,7 @@ const AdminCalendar = () => {
                 return (
                   <div
                     key={day.toISOString()}
-                    className="border-l border-border/40 min-h-[56px] relative group cursor-pointer hover:bg-secondary/30 transition-colors"
+                    className="border-l border-border/40 min-h-[56px] relative group cursor-pointer hover:bg-secondary/30 transition-colors overflow-hidden"
                     onClick={() => handleCellClick(day, hour)}
                   >
                     <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
