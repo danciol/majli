@@ -149,7 +149,7 @@ const AppointmentDialog = ({
               if (svc) setDuration(svc.duration);
             }}>
               <SelectTrigger><SelectValue placeholder="Wybierz usługę" /></SelectTrigger>
-              <SelectContent>
+              <SelectContent position="popper" className="z-[100]">
                 {availableServices.map(s => (
                   <SelectItem key={s.id} value={s.id}>
                     {s.name} ({s.duration} min · {s.price} zł)
