@@ -109,7 +109,7 @@ const AppointmentDialog = ({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto">
+      <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto" style={{ zIndex: 50 }}>
         <DialogHeader>
           <DialogTitle>{isEdit ? 'Edytuj wizytę' : 'Nowa wizyta'}</DialogTitle>
         </DialogHeader>
@@ -133,7 +133,7 @@ const AppointmentDialog = ({
               setServiceId('');
             }}>
               <SelectTrigger><SelectValue placeholder="Wybierz pracownika" /></SelectTrigger>
-              <SelectContent>
+              <SelectContent position="popper" className="z-[100]">
                 {employees.map(e => (
                   <SelectItem key={e.id} value={e.id}>{e.name}</SelectItem>
                 ))}
@@ -149,7 +149,7 @@ const AppointmentDialog = ({
               if (svc) setDuration(svc.duration);
             }}>
               <SelectTrigger><SelectValue placeholder="Wybierz usługę" /></SelectTrigger>
-              <SelectContent>
+              <SelectContent position="popper" className="z-[100]">
                 {availableServices.map(s => (
                   <SelectItem key={s.id} value={s.id}>
                     {s.name} ({s.duration} min · {s.price} zł)
@@ -184,7 +184,7 @@ const AppointmentDialog = ({
               <Label>Status</Label>
               <Select value={status} onValueChange={(v) => setStatus(v as Appointment['status'])}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>
+                <SelectContent position="popper" className="z-[100]">
                   <SelectItem value="pending">Oczekuje</SelectItem>
                   <SelectItem value="confirmed">Potwierdzona</SelectItem>
                   <SelectItem value="completed">Zakończona</SelectItem>

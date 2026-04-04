@@ -4,7 +4,7 @@ import { pl } from 'date-fns/locale';
 import { ChevronLeft, ChevronRight, Upload, FileUp, CheckCircle2, Plus, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Appointment } from '@/data/services';
-import { useAppointments, useServices, useEmployees } from '@/hooks/useFirestore';
+import { useAppointments, useServices, useEmployees, useClients } from '@/hooks/useFirestore';
 import { useAuth } from '@/contexts/AuthContext';
 import { parseICSFile } from '@/lib/icsParser';
 import { toast } from 'sonner';
@@ -47,6 +47,7 @@ const AdminCalendar = () => {
   const { appointments, loading: loadingA, addAppointment, updateAppointment, deleteAppointment } = useAppointments();
   const { services, loading: loadingS } = useServices();
   const { employees, loading: loadingE } = useEmployees();
+  const { clients, addClient } = useClients();
   const { employee: currentUser } = useAuth();
   const [showImportDialog, setShowImportDialog] = useState(false);
   const [pendingImport, setPendingImport] = useState<Partial<Appointment>[]>([]);
@@ -131,6 +132,8 @@ const AdminCalendar = () => {
     if (!selectedEmployeeId) { toast.error('Wybierz pracownika'); return; }
     try {
       let imported = 0;
+      const existingClientPhones = new Set(clients.map(c => c.phone).filter(Boolean));
+      
       for (const p of pendingImport) {
         const apptData: Omit<Appointment, 'id'> = {
           serviceId: p.serviceId || '',
@@ -147,6 +150,19 @@ const AdminCalendar = () => {
         if (p.notes) apptData.notes = p.notes;
         await addAppointment(apptData);
         imported++;
+
+        // Auto-create client if not exists
+        const phone = p.clientPhone || '';
+        const name = p.clientName || '';
+        if (name && phone && !existingClientPhones.has(phone)) {
+          await addClient({
+            name,
+            phone,
+            email: p.clientEmail || '',
+            appointmentIds: [],
+          });
+          existingClientPhones.add(phone);
+        }
       }
       setPendingImport([]);
       setShowImportDialog(false);
@@ -271,7 +287,7 @@ const AdminCalendar = () => {
                 return (
                   <div
                     key={day.toISOString()}
-                    className="border-l border-border/40 min-h-[56px] relative group cursor-pointer hover:bg-secondary/30 transition-colors"
+                    className="border-l border-border/40 min-h-[56px] relative group cursor-pointer hover:bg-secondary/30 transition-colors overflow-hidden"
                     onClick={() => handleCellClick(day, hour)}
                   >
                     <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
