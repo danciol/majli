@@ -132,6 +132,8 @@ const AdminCalendar = () => {
     if (!selectedEmployeeId) { toast.error('Wybierz pracownika'); return; }
     try {
       let imported = 0;
+      const existingClientPhones = new Set(clients.map(c => c.phone).filter(Boolean));
+      
       for (const p of pendingImport) {
         const apptData: Omit<Appointment, 'id'> = {
           serviceId: p.serviceId || '',
@@ -148,6 +150,19 @@ const AdminCalendar = () => {
         if (p.notes) apptData.notes = p.notes;
         await addAppointment(apptData);
         imported++;
+
+        // Auto-create client if not exists
+        const phone = p.clientPhone || '';
+        const name = p.clientName || '';
+        if (name && phone && !existingClientPhones.has(phone)) {
+          await addClient({
+            name,
+            phone,
+            email: p.clientEmail || '',
+            appointmentIds: [],
+          });
+          existingClientPhones.add(phone);
+        }
       }
       setPendingImport([]);
       setShowImportDialog(false);
