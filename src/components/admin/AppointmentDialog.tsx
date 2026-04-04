@@ -109,7 +109,7 @@ const AppointmentDialog = ({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto">
+      <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto" style={{ zIndex: 50 }}>
         <DialogHeader>
           <DialogTitle>{isEdit ? 'Edytuj wizytę' : 'Nowa wizyta'}</DialogTitle>
         </DialogHeader>
