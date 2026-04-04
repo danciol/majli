@@ -11,11 +11,9 @@ import { toast } from 'sonner';
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription,
 } from '@/components/ui/dialog';
-import {
-  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
-} from '@/components/ui/select';
 import { Label } from '@/components/ui/label';
 import AppointmentDialog from '@/components/admin/AppointmentDialog';
+import { NativeSelect } from '@/components/ui/native-select';
 
 const hours = Array.from({ length: 13 }, (_, i) => i + 8);
 
@@ -220,17 +218,14 @@ const AdminCalendar = () => {
         </div>
         <div className="flex items-center gap-2 flex-wrap">
           {visibleEmployees.length > 1 && (
-            <Select value={filterEmployeeId} onValueChange={setFilterEmployeeId}>
-              <SelectTrigger className="w-[180px] h-8 text-sm">
-                <SelectValue placeholder="Wszyscy" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Wszyscy pracownicy</SelectItem>
+            <div className="w-[180px]">
+              <NativeSelect value={filterEmployeeId} onChange={(e) => setFilterEmployeeId(e.target.value)} className="h-8 py-1 pr-8 text-sm">
+                <option value="all">Wszyscy pracownicy</option>
                 {visibleEmployees.map(e => (
-                  <SelectItem key={e.id} value={e.id}>{e.name}</SelectItem>
+                  <option key={e.id} value={e.id}>{e.name}</option>
                 ))}
-              </SelectContent>
-            </Select>
+              </NativeSelect>
+            </div>
           )}
           <input ref={fileInputRef} type="file" accept=".ics" onChange={handleFileUpload} className="hidden" />
           {isAdmin && (
@@ -360,14 +355,12 @@ const AdminCalendar = () => {
           <div className="space-y-4">
             <div>
               <Label className="mb-1.5 block">Pracownik</Label>
-              <Select value={selectedEmployeeId} onValueChange={handleEmployeeChange}>
-                <SelectTrigger><SelectValue placeholder="Wybierz pracownika" /></SelectTrigger>
-                <SelectContent>
+              <NativeSelect value={selectedEmployeeId} onChange={(e) => handleEmployeeChange(e.target.value)}>
+                <option value="">Wybierz pracownika</option>
                   {employees.map(emp => (
-                    <SelectItem key={emp.id} value={emp.id}>{emp.name}</SelectItem>
+                  <option key={emp.id} value={emp.id}>{emp.name}</option>
                   ))}
-                </SelectContent>
-              </Select>
+              </NativeSelect>
             </div>
 
             <div>

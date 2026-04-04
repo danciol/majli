@@ -1,6 +1,7 @@
 import { useState, useMemo } from 'react';
 import { useClients, useAppointments, useServices } from '@/hooks/useFirestore';
-import { Users, Search, Loader2, Phone, Mail, Calendar, Plus, ChevronDown, ChevronUp } from 'lucide-react';
+import type { Client } from '@/data/services';
+import { Users, Search, Loader2, Phone, Mail, Calendar, Plus, ChevronDown, ChevronUp, Pencil } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
@@ -9,17 +10,39 @@ import {
 } from '@/components/ui/dialog';
 import { format } from 'date-fns';
 import { pl } from 'date-fns/locale';
+import { toast } from 'sonner';
+
+type ClientForm = Pick<Client, 'name' | 'phone' | 'email'>;
+
+const emptyForm: ClientForm = {
+  name: '',
+  phone: '',
+  email: '',
+};
+
+const statusLabels = {
+  pending: 'Oczekuje',
+  confirmed: 'Potwierdzona',
+  cancelled: 'Anulowana',
+  completed: 'Zakończona',
+} as const;
+
+const statusClasses = {
+  pending: 'bg-accent/10 text-accent-foreground',
+  confirmed: 'bg-primary/10 text-primary',
+  cancelled: 'bg-destructive/10 text-destructive',
+  completed: 'bg-secondary text-secondary-foreground',
+} as const;
 
 const AdminClients = () => {
-  const { clients, loading: loadingC, addClient } = useClients();
+  const { clients, loading: loadingC, addClient, updateClient } = useClients();
   const { appointments, loading: loadingA } = useAppointments();
   const { services, loading: loadingS } = useServices();
   const [search, setSearch] = useState('');
   const [expandedId, setExpandedId] = useState<string | null>(null);
-  const [showAddDialog, setShowAddDialog] = useState(false);
-  const [newName, setNewName] = useState('');
-  const [newPhone, setNewPhone] = useState('');
-  const [newEmail, setNewEmail] = useState('');
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [editingClient, setEditingClient] = useState<Client | null>(null);
+  const [form, setForm] = useState<ClientForm>(emptyForm);
 
   const loading = loadingC || loadingA || loadingS;
 
@@ -29,28 +52,96 @@ const AdminClients = () => {
     return clients.filter(c =>
       c.name.toLowerCase().includes(q) ||
       c.phone.toLowerCase().includes(q) ||
-      c.email.toLowerCase().includes(q)
+        c.email.toLowerCase().includes(q)
     );
   }, [clients, search]);
 
-  const getClientAppointments = (clientName: string, clientPhone: string) => {
-    return appointments.filter(a =>
-      a.clientName === clientName || (clientPhone && a.clientPhone === clientPhone)
-    ).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+  const clientAppointmentsMap = useMemo(() => {
+    const map = new Map<string, typeof appointments>();
+
+    clients.forEach((client) => {
+      const linkedIds = new Set(client.appointmentIds || []);
+
+      appointments.forEach((appointment) => {
+        if (
+          linkedIds.has(appointment.id) ||
+          (client.phone && appointment.clientPhone === client.phone) ||
+          appointment.clientName === client.name
+        ) {
+          linkedIds.add(appointment.id);
+        }
+      });
+
+      const clientAppointments = appointments
+        .filter((appointment) => linkedIds.has(appointment.id))
+        .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+
+      map.set(client.id, clientAppointments);
+    });
+
+    return map;
+  }, [appointments, clients]);
+
+  const closeDialog = () => {
+    setDialogOpen(false);
+    setEditingClient(null);
+    setForm(emptyForm);
   };
 
-  const handleAddClient = async () => {
-    if (!newName.trim()) return;
-    await addClient({
-      name: newName.trim(),
-      phone: newPhone.trim(),
-      email: newEmail.trim(),
-      appointmentIds: [],
+  const openAddDialog = () => {
+    setEditingClient(null);
+    setForm(emptyForm);
+    setDialogOpen(true);
+  };
+
+  const openEditDialog = (client: Client) => {
+    setEditingClient(client);
+    setForm({
+      name: client.name,
+      phone: client.phone,
+      email: client.email,
     });
-    setNewName('');
-    setNewPhone('');
-    setNewEmail('');
-    setShowAddDialog(false);
+    setDialogOpen(true);
+  };
+
+  const handleSaveClient = async () => {
+    const name = form.name.trim();
+    const phone = form.phone.trim();
+    const email = form.email.trim();
+
+    if (!name) return;
+
+    const existingLinks = editingClient
+      ? clientAppointmentsMap.get(editingClient.id)?.map((appointment) => appointment.id) || []
+      : appointments
+          .filter((appointment) => (phone && appointment.clientPhone === phone) || appointment.clientName === name)
+          .map((appointment) => appointment.id);
+
+    const appointmentIds = Array.from(new Set([...(editingClient?.appointmentIds || []), ...existingLinks]));
+
+    try {
+      if (editingClient) {
+        await updateClient(editingClient.id, {
+          name,
+          phone,
+          email,
+          appointmentIds,
+        });
+        toast.success('Dane klienta zapisane');
+      } else {
+        await addClient({
+          name,
+          phone,
+          email,
+          appointmentIds,
+        });
+        toast.success('Klient dodany');
+      }
+
+      closeDialog();
+    } catch {
+      toast.error('Nie udało się zapisać klienta');
+    }
   };
 
   if (loading) return <div className="flex items-center justify-center py-20"><Loader2 className="w-6 h-6 animate-spin text-primary" /></div>;
@@ -72,7 +163,7 @@ const AdminClients = () => {
               className="pl-9"
             />
           </div>
-          <Button size="sm" onClick={() => setShowAddDialog(true)} className="gap-1.5">
+          <Button size="sm" onClick={openAddDialog} className="gap-1.5">
             <Plus className="w-4 h-4" /> Dodaj klienta
           </Button>
         </div>
@@ -85,23 +176,31 @@ const AdminClients = () => {
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {filtered.map((client) => {
-            const clientAppts = getClientAppointments(client.name, client.phone);
+            const clientAppts = clientAppointmentsMap.get(client.id) || [];
             const lastAppt = clientAppts[0];
             const lastService = lastAppt ? services.find(s => s.id === lastAppt.serviceId) : null;
             const isExpanded = expandedId === client.id;
 
             return (
               <div key={client.id} className="glass-card p-5">
-                <div className="flex items-start justify-between">
+                <div className="flex items-start justify-between gap-2">
                   <h3 className="font-heading font-semibold text-foreground mb-2">{client.name}</h3>
-                  {clientAppts.length > 0 && (
-                    <button
-                      onClick={() => setExpandedId(isExpanded ? null : client.id)}
-                      className="text-muted-foreground hover:text-foreground transition-colors p-1"
-                    >
-                      {isExpanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
-                    </button>
-                  )}
+                  <div className="flex items-center gap-1">
+                    <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => openEditDialog(client)} title="Edytuj klienta">
+                      <Pencil className="w-4 h-4" />
+                    </Button>
+                    {clientAppts.length > 0 && (
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8"
+                        onClick={() => setExpandedId(isExpanded ? null : client.id)}
+                        title={isExpanded ? 'Zwiń historię' : 'Rozwiń historię'}
+                      >
+                        {isExpanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+                      </Button>
+                    )}
+                  </div>
                 </div>
                 <div className="space-y-1.5 text-sm">
                   {client.phone && (
@@ -139,15 +238,8 @@ const AdminClients = () => {
                               {format(new Date(appt.date), 'd MMM yyyy, HH:mm', { locale: pl })}
                             </span>
                           </div>
-                          <span className={`text-[10px] px-1.5 py-0.5 rounded-full ${
-                            appt.status === 'completed' ? 'bg-green-100 text-green-700' :
-                            appt.status === 'confirmed' ? 'bg-primary/10 text-primary' :
-                            appt.status === 'cancelled' ? 'bg-destructive/10 text-destructive' :
-                            'bg-accent/10 text-accent-foreground'
-                          }`}>
-                            {appt.status === 'completed' ? 'Zakończona' :
-                             appt.status === 'confirmed' ? 'Potwierdzona' :
-                             appt.status === 'cancelled' ? 'Anulowana' : 'Oczekuje'}
+                          <span className={`text-[10px] px-1.5 py-0.5 rounded-full ${statusClasses[appt.status]}`}>
+                            {statusLabels[appt.status]}
                           </span>
                         </div>
                       );
@@ -160,27 +252,27 @@ const AdminClients = () => {
         </div>
       )}
 
-      <Dialog open={showAddDialog} onOpenChange={setShowAddDialog}>
+      <Dialog open={dialogOpen} onOpenChange={(open) => { if (!open) closeDialog(); else setDialogOpen(true); }}>
         <DialogContent className="max-w-sm">
           <DialogHeader>
-            <DialogTitle>Dodaj klienta</DialogTitle>
+            <DialogTitle>{editingClient ? 'Edytuj klienta' : 'Dodaj klienta'}</DialogTitle>
           </DialogHeader>
           <div className="space-y-4 pt-2">
             <div className="space-y-1.5">
               <Label>Imię i nazwisko *</Label>
-              <Input value={newName} onChange={e => setNewName(e.target.value)} placeholder="Jan Kowalski" />
+              <Input value={form.name} onChange={e => setForm((current) => ({ ...current, name: e.target.value }))} placeholder="Jan Kowalski" />
             </div>
             <div className="space-y-1.5">
               <Label>Telefon</Label>
-              <Input value={newPhone} onChange={e => setNewPhone(e.target.value)} placeholder="+48 600 100 200" />
+              <Input value={form.phone} onChange={e => setForm((current) => ({ ...current, phone: e.target.value }))} placeholder="+48 600 100 200" />
             </div>
             <div className="space-y-1.5">
               <Label>Email</Label>
-              <Input type="email" value={newEmail} onChange={e => setNewEmail(e.target.value)} placeholder="email@example.com" />
+              <Input type="email" value={form.email} onChange={e => setForm((current) => ({ ...current, email: e.target.value }))} placeholder="email@example.com" />
             </div>
             <div className="flex gap-2 justify-end pt-2">
-              <Button variant="outline" onClick={() => setShowAddDialog(false)}>Anuluj</Button>
-              <Button onClick={handleAddClient} disabled={!newName.trim()}>Dodaj</Button>
+              <Button variant="outline" onClick={closeDialog}>Anuluj</Button>
+              <Button onClick={handleSaveClient} disabled={!form.name.trim()}>{editingClient ? 'Zapisz' : 'Dodaj'}</Button>
             </div>
           </div>
         </DialogContent>

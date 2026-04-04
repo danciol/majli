@@ -5,9 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import {
-  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
-} from '@/components/ui/select';
+import { NativeSelect } from '@/components/ui/native-select';
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle,
 } from '@/components/ui/dialog';
@@ -128,35 +126,38 @@ const AppointmentDialog = ({
 
           <div className="space-y-1.5">
             <Label>Pracownik</Label>
-            <Select value={employeeId} onValueChange={(v) => {
-              setEmployeeId(v);
+            <NativeSelect value={employeeId} onChange={(e) => {
+              setEmployeeId(e.target.value);
               setServiceId('');
             }}>
-              <SelectTrigger><SelectValue placeholder="Wybierz pracownika" /></SelectTrigger>
-              <SelectContent position="popper" className="z-[100]">
+              <option value="">Wybierz pracownika</option>
                 {employees.map(e => (
-                  <SelectItem key={e.id} value={e.id}>{e.name}</SelectItem>
+                <option key={e.id} value={e.id}>{e.name}</option>
                 ))}
-              </SelectContent>
-            </Select>
+            </NativeSelect>
           </div>
 
           <div className="space-y-1.5">
             <Label>Usługa</Label>
-            <Select value={serviceId} onValueChange={(v) => {
-              setServiceId(v);
-              const svc = services.find(s => s.id === v);
-              if (svc) setDuration(svc.duration);
-            }}>
-              <SelectTrigger><SelectValue placeholder="Wybierz usługę" /></SelectTrigger>
-              <SelectContent position="popper" className="z-[100]">
-                {availableServices.map(s => (
-                  <SelectItem key={s.id} value={s.id}>
-                    {s.name} ({s.duration} min · {s.price} zł)
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <NativeSelect
+              value={serviceId}
+              onChange={(e) => {
+                const value = e.target.value;
+                setServiceId(value);
+                const svc = services.find(s => s.id === value);
+                if (svc) setDuration(svc.duration);
+              }}
+              disabled={availableServices.length === 0}
+            >
+              <option value="">
+                {availableServices.length === 0 ? 'Brak usług dla wybranego pracownika' : 'Wybierz usługę'}
+              </option>
+              {availableServices.map(s => (
+                <option key={s.id} value={s.id}>
+                  {s.name} ({s.duration} min · {s.price} zł)
+                </option>
+              ))}
+            </NativeSelect>
           </div>
 
           <div className="space-y-1.5">
@@ -182,15 +183,12 @@ const AppointmentDialog = ({
             </div>
             <div className="space-y-1.5">
               <Label>Status</Label>
-              <Select value={status} onValueChange={(v) => setStatus(v as Appointment['status'])}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent position="popper" className="z-[100]">
-                  <SelectItem value="pending">Oczekuje</SelectItem>
-                  <SelectItem value="confirmed">Potwierdzona</SelectItem>
-                  <SelectItem value="completed">Zakończona</SelectItem>
-                  <SelectItem value="cancelled">Anulowana</SelectItem>
-                </SelectContent>
-              </Select>
+              <NativeSelect value={status} onChange={(e) => setStatus(e.target.value as Appointment['status'])}>
+                <option value="pending">Oczekuje</option>
+                <option value="confirmed">Potwierdzona</option>
+                <option value="completed">Zakończona</option>
+                <option value="cancelled">Anulowana</option>
+              </NativeSelect>
             </div>
           </div>
 
