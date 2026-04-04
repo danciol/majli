@@ -133,7 +133,7 @@ const AppointmentDialog = ({
               setServiceId('');
             }}>
               <SelectTrigger><SelectValue placeholder="Wybierz pracownika" /></SelectTrigger>
-              <SelectContent>
+              <SelectContent position="popper" className="z-[100]">
                 {employees.map(e => (
                   <SelectItem key={e.id} value={e.id}>{e.name}</SelectItem>
                 ))}
