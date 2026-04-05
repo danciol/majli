@@ -322,44 +322,111 @@ const AdminCalendar = () => {
                   ))}
 
                   {/* Appointments overlay */}
-                  {dayAppts.map((a) => {
-                    const aDate = new Date(a.date);
-                    const startHour = aDate.getHours() + aDate.getMinutes() / 60;
-                    const topPx = (startHour - START_HOUR) * HOUR_HEIGHT;
-                    const heightPx = (a.duration / 60) * HOUR_HEIGHT;
-                    const service = services.find(s => s.id === a.serviceId);
-                    const employee = employees.find(e => e.id === a.employeeId);
-                    const empColor = getEmployeeColor(a.employeeId, employees);
+                  {(() => {
+                    // Calculate columns for overlapping appointments
+                    const sorted = [...dayAppts].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+                    const columns: { end: number; appt: typeof sorted[0] }[][] = [];
+                    const apptLayout = new Map<string, { col: number; totalCols: number }>();
 
-                    // Don't render if outside visible range
-                    if (topPx < 0 || topPx >= hours.length * HOUR_HEIGHT) return null;
+                    for (const a of sorted) {
+                      const aStart = new Date(a.date).getTime();
+                      const aEnd = aStart + a.duration * 60000;
+                      let placed = false;
+                      for (let c = 0; c < columns.length; c++) {
+                        const lastInCol = columns[c][columns[c].length - 1];
+                        if (aStart >= lastInCol.end) {
+                          columns[c].push({ end: aEnd, appt: a });
+                          apptLayout.set(a.id, { col: c, totalCols: 0 });
+                          placed = true;
+                          break;
+                        }
+                      }
+                      if (!placed) {
+                        columns.push([{ end: aEnd, appt: a }]);
+                        apptLayout.set(a.id, { col: columns.length - 1, totalCols: 0 });
+                      }
+                    }
 
-                    return (
-                      <div
-                        key={a.id}
-                        onClick={(e) => handleAppointmentClick(e, a)}
-                        className={`absolute left-0.5 right-0.5 z-10 rounded-md px-2 py-1 text-xs cursor-pointer border-l-[3px] transition-all hover:shadow-md overflow-hidden ${empColor.bg} ${empColor.border} ${empColor.text}`}
-                        style={{ top: `${topPx}px`, height: `${Math.max(heightPx, 24)}px` }}
-                        title={`${a.clientName}${service ? ` – ${service.name}` : ''}${a.notes ? `\n${a.notes}` : ''}`}
-                      >
-                        <p className="font-bold truncate leading-tight">
-                          {a.clientName}
-                        </p>
-                        <p className="truncate opacity-70 leading-tight">
-                          {format(aDate, 'HH:mm')} · {service?.name || 'Wizyta'}
-                        </p>
-                        {heightPx > 40 && a.clientPhone && (
-                          <p className="truncate opacity-70 leading-tight">📞 {formatPhoneNumber(a.clientPhone)}</p>
-                        )}
-                        {heightPx > 56 && a.notes && (
-                          <p className="truncate opacity-60 leading-tight italic">📝 {a.notes}</p>
-                        )}
-                        {heightPx > 72 && employee && (
-                          <p className="truncate opacity-50 leading-tight">{employee.name}</p>
-                        )}
-                      </div>
-                    );
-                  })}
+                    // Determine totalCols for each group of overlapping appointments
+                    for (const a of sorted) {
+                      const aStart = new Date(a.date).getTime();
+                      const aEnd = aStart + a.duration * 60000;
+                      let maxCol = 0;
+                      for (const b of sorted) {
+                        const bStart = new Date(b.date).getTime();
+                        const bEnd = bStart + b.duration * 60000;
+                        if (aStart < bEnd && aEnd > bStart) {
+                          const bLayout = apptLayout.get(b.id);
+                          if (bLayout) maxCol = Math.max(maxCol, bLayout.col);
+                        }
+                      }
+                      const layout = apptLayout.get(a.id)!;
+                      layout.totalCols = Math.max(layout.totalCols, maxCol + 1);
+                    }
+                    // Second pass to propagate totalCols
+                    for (const a of sorted) {
+                      const aStart = new Date(a.date).getTime();
+                      const aEnd = aStart + a.duration * 60000;
+                      const aLayout = apptLayout.get(a.id)!;
+                      for (const b of sorted) {
+                        const bStart = new Date(b.date).getTime();
+                        const bEnd = bStart + b.duration * 60000;
+                        if (aStart < bEnd && aEnd > bStart) {
+                          const bLayout = apptLayout.get(b.id)!;
+                          const maxCols = Math.max(aLayout.totalCols, bLayout.totalCols);
+                          aLayout.totalCols = maxCols;
+                          bLayout.totalCols = maxCols;
+                        }
+                      }
+                    }
+
+                    return dayAppts.map((a) => {
+                      const aDate = new Date(a.date);
+                      const startHour = aDate.getHours() + aDate.getMinutes() / 60;
+                      const topPx = (startHour - START_HOUR) * HOUR_HEIGHT;
+                      const heightPx = (a.duration / 60) * HOUR_HEIGHT;
+                      const service = services.find(s => s.id === a.serviceId);
+                      const employee = employees.find(e => e.id === a.employeeId);
+                      const empColor = getEmployeeColor(a.employeeId, employees);
+                      const layout = apptLayout.get(a.id) || { col: 0, totalCols: 1 };
+
+                      if (topPx < 0 || topPx >= hours.length * HOUR_HEIGHT) return null;
+
+                      const widthPercent = 100 / layout.totalCols;
+                      const leftPercent = layout.col * widthPercent;
+
+                      return (
+                        <div
+                          key={a.id}
+                          onClick={(e) => handleAppointmentClick(e, a)}
+                          className={`absolute z-10 rounded-md px-1.5 py-1 text-xs cursor-pointer border-l-[3px] transition-all hover:shadow-md hover:z-20 overflow-hidden ${empColor.bg} ${empColor.border} ${empColor.text}`}
+                          style={{
+                            top: `${topPx}px`,
+                            height: `${Math.max(heightPx, 24)}px`,
+                            left: `${leftPercent}%`,
+                            width: `calc(${widthPercent}% - 2px)`,
+                          }}
+                          title={`${a.clientName}${service ? ` – ${service.name}` : ''}${a.notes ? `\n${a.notes}` : ''}`}
+                        >
+                          <p className="font-bold truncate leading-tight">
+                            {a.clientName}
+                          </p>
+                          <p className="truncate opacity-70 leading-tight">
+                            {format(aDate, 'HH:mm')} · {service?.name || 'Wizyta'}
+                          </p>
+                          {heightPx > 40 && a.clientPhone && (
+                            <p className="truncate opacity-70 leading-tight">📞 {formatPhoneNumber(a.clientPhone)}</p>
+                          )}
+                          {heightPx > 56 && a.notes && (
+                            <p className="truncate opacity-60 leading-tight italic">📝 {a.notes}</p>
+                          )}
+                          {heightPx > 72 && employee && (
+                            <p className="truncate opacity-50 leading-tight">{employee.name}</p>
+                          )}
+                        </div>
+                      );
+                    });
+                  })()}
                 </div>
               );
             })}
