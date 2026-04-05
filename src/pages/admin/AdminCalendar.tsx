@@ -12,17 +12,12 @@ import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription,
 } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
-import AppointmentDialog from '@/components/admin/AppointmentDialog';
+import AppointmentDialog, { formatPhoneNumber } from '@/components/admin/AppointmentDialog';
 import { NativeSelect } from '@/components/ui/native-select';
 
+const HOUR_HEIGHT = 56; // px per hour row
 const hours = Array.from({ length: 13 }, (_, i) => i + 8);
-
-const statusColors: Record<string, string> = {
-  pending: 'bg-accent/20 border-accent text-accent-foreground',
-  confirmed: 'bg-primary/15 border-primary text-primary',
-  cancelled: 'bg-destructive/15 border-destructive text-destructive',
-  completed: 'bg-green-500/15 border-green-500 text-green-700',
-};
+const START_HOUR = 8;
 
 const employeeColors = [
   { bg: 'bg-pink-100 dark:bg-pink-900/30', border: 'border-pink-400', text: 'text-pink-800 dark:text-pink-200' },
@@ -40,12 +35,16 @@ function getEmployeeColor(employeeId: string, employees: { id: string }[]) {
   return employeeColors[idx >= 0 ? idx % employeeColors.length : 0];
 }
 
+function normalizePhone(phone: string): string {
+  return phone.replace(/\D/g, '').slice(-9);
+}
+
 const AdminCalendar = () => {
   const [currentDate, setCurrentDate] = useState(new Date());
   const { appointments, loading: loadingA, addAppointment, updateAppointment, deleteAppointment } = useAppointments();
   const { services, loading: loadingS } = useServices();
   const { employees, loading: loadingE } = useEmployees();
-  const { clients, addClient } = useClients();
+  const { clients, addClient, updateClient } = useClients();
   const { employee: currentUser } = useAuth();
   const [showImportDialog, setShowImportDialog] = useState(false);
   const [pendingImport, setPendingImport] = useState<Partial<Appointment>[]>([]);
@@ -57,12 +56,10 @@ const AdminCalendar = () => {
   const [editingAppointment, setEditingAppointment] = useState<Appointment | null>(null);
   const [newApptDate, setNewApptDate] = useState<Date | null>(null);
 
-  // Filter by selected visible employee
   const [filterEmployeeId, setFilterEmployeeId] = useState<string>('all');
 
   const isAdmin = currentUser?.role === 'admin';
 
-  // Which employees this user can see
   const visibleEmployees = isAdmin
     ? employees
     : employees.filter(e =>
@@ -70,7 +67,6 @@ const AdminCalendar = () => {
         (currentUser?.canViewCalendars || []).includes(e.id)
       );
 
-  // Filter appointments
   const filteredAppointments = appointments.filter(a => {
     const visibleIds = visibleEmployees.map(e => e.id);
     if (!visibleIds.includes(a.employeeId)) return false;
@@ -82,6 +78,27 @@ const AdminCalendar = () => {
   const weekStart = startOfWeek(currentDate, { weekStartsOn: 1 });
   const weekDays = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i));
 
+  // --- Auto-save / update client in DB ---
+  const upsertClient = async (name: string, phone: string, email: string) => {
+    if (!name || !phone) return;
+    const normalized = normalizePhone(phone);
+    if (normalized.length < 9) return;
+    const existing = clients.find(c => normalizePhone(c.phone) === normalized);
+    if (existing) {
+      // Update name/email if changed
+      if (existing.name !== name || existing.email !== (email || existing.email)) {
+        await updateClient(existing.id, { name, email: email || existing.email });
+      }
+    } else {
+      await addClient({
+        name,
+        phone: formatPhoneNumber(normalized),
+        email: email || '',
+        appointmentIds: [],
+      });
+    }
+  };
+
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -89,10 +106,8 @@ const AdminCalendar = () => {
     try {
       const text = await file.text();
       setRawIcsText(text);
-      // Show employee selection dialog first
       setSelectedEmployeeId(employees.length > 0 ? employees[0].id : '');
       setShowImportDialog(true);
-      // Parse with default employee for preview
       const events = parseICSFile(text, services, employees.length > 0 ? employees[0].id : '');
       if (events.length === 0) { toast.error('Nie znaleziono wydarzeń w pliku'); setShowImportDialog(false); return; }
       const oneMonthAgo = new Date();
@@ -111,7 +126,6 @@ const AdminCalendar = () => {
 
   const handleEmployeeChange = (empId: string) => {
     setSelectedEmployeeId(empId);
-    // Re-parse with new employee
     if (rawIcsText) {
       const events = parseICSFile(rawIcsText, services, empId);
       const oneMonthAgo = new Date();
@@ -130,14 +144,14 @@ const AdminCalendar = () => {
     if (!selectedEmployeeId) { toast.error('Wybierz pracownika'); return; }
     try {
       let imported = 0;
-      const existingClientPhones = new Set(clients.map(c => c.phone).filter(Boolean));
+      const seenPhones = new Set(clients.map(c => normalizePhone(c.phone)).filter(p => p.length >= 9));
       
       for (const p of pendingImport) {
         const apptData: Omit<Appointment, 'id'> = {
           serviceId: p.serviceId || '',
           employeeId: selectedEmployeeId,
           clientName: p.clientName || 'Klient',
-          clientPhone: p.clientPhone || '',
+          clientPhone: p.clientPhone ? formatPhoneNumber(p.clientPhone) : '',
           clientEmail: p.clientEmail || '',
           date: p.date || new Date().toISOString(),
           duration: p.duration || 60,
@@ -150,16 +164,16 @@ const AdminCalendar = () => {
         imported++;
 
         // Auto-create client if not exists
-        const phone = p.clientPhone || '';
+        const phone = normalizePhone(p.clientPhone || '');
         const name = p.clientName || '';
-        if (name && phone && !existingClientPhones.has(phone)) {
+        if (name && phone.length >= 9 && !seenPhones.has(phone)) {
           await addClient({
             name,
-            phone,
+            phone: formatPhoneNumber(phone),
             email: p.clientEmail || '',
             appointmentIds: [],
           });
-          existingClientPhones.add(phone);
+          seenPhones.add(phone);
         }
       }
       setPendingImport([]);
@@ -195,6 +209,8 @@ const AdminCalendar = () => {
         await addAppointment(rest);
         toast.success('Wizyta dodana');
       }
+      // Auto-save client
+      await upsertClient(data.clientName, data.clientPhone, data.clientEmail);
     } catch { toast.error('Błąd zapisu'); }
   };
 
@@ -208,6 +224,11 @@ const AdminCalendar = () => {
   const goToToday = () => setCurrentDate(new Date());
 
   if (loading) return <div className="flex items-center justify-center py-20"><Loader2 className="w-6 h-6 animate-spin text-primary" /></div>;
+
+  // Get appointments for a specific day
+  const getDayAppointments = (day: Date) => {
+    return filteredAppointments.filter(a => isSameDay(new Date(a.date), day));
+  };
 
   return (
     <div className="space-y-4">
@@ -249,6 +270,7 @@ const AdminCalendar = () => {
 
       <div className="bg-card rounded-xl border border-border shadow-sm overflow-auto">
         <div className="min-w-[800px]">
+          {/* Header row */}
           <div className="grid grid-cols-[56px_repeat(7,1fr)] border-b border-border sticky top-0 bg-card z-10">
             <div className="p-2" />
             {weekDays.map((day) => {
@@ -268,64 +290,80 @@ const AdminCalendar = () => {
             })}
           </div>
 
-          {hours.map((hour) => (
-            <div key={hour} className="grid grid-cols-[56px_repeat(7,1fr)] border-b border-border/40">
-              <div className="pr-2 pt-0 text-[11px] text-muted-foreground text-right -translate-y-2">
-                {hour}:00
-              </div>
-              {weekDays.map((day) => {
-                const dayAppts = filteredAppointments.filter((a) => {
-                  const aDate = new Date(a.date);
-                  return isSameDay(aDate, day) && aDate.getHours() === hour;
-                });
-
-                return (
-                  <div
-                    key={day.toISOString()}
-                    className="border-l border-border/40 min-h-[56px] relative group cursor-pointer hover:bg-secondary/30 transition-colors overflow-hidden"
-                    onClick={() => handleCellClick(day, hour)}
-                  >
-                    <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
-                      <Plus className="w-4 h-4 text-muted-foreground/40" />
-                    </div>
-
-                    {dayAppts.map((a) => {
-                      const service = services.find(s => s.id === a.serviceId);
-                      const employee = employees.find(e => e.id === a.employeeId);
-                      const heightBlocks = Math.max(1, Math.ceil(a.duration / 60));
-                      const empColor = getEmployeeColor(a.employeeId, employees);
-
-                      return (
-                        <div
-                          key={a.id}
-                          onClick={(e) => handleAppointmentClick(e, a)}
-                          className={`relative z-10 rounded-md px-2 py-1 text-xs cursor-pointer border-l-[3px] mb-0.5 transition-all hover:shadow-md ${empColor.bg} ${empColor.border} ${empColor.text}`}
-                          style={{ minHeight: `${heightBlocks * 48}px` }}
-                          title={`${a.clientName}${service ? ` – ${service.name}` : ''}${a.notes ? `\n${a.notes}` : ''}`}
-                        >
-                          <p className="font-bold truncate leading-tight">
-                            {a.clientName}
-                          </p>
-                          <p className="truncate opacity-70 leading-tight">
-                            {format(new Date(a.date), 'HH:mm')} · {service?.name || 'Wizyta'}
-                          </p>
-                          {a.clientPhone && (
-                            <p className="truncate opacity-70 leading-tight">📞 {a.clientPhone}</p>
-                          )}
-                          {a.notes && (
-                            <p className="truncate opacity-60 leading-tight italic">📝 {a.notes}</p>
-                          )}
-                          {employee && (
-                            <p className="truncate opacity-50 leading-tight">{employee.name}</p>
-                          )}
-                        </div>
-                      );
-                    })}
-                  </div>
-                );
-              })}
+          {/* Body: time grid with absolutely positioned appointments */}
+          <div className="grid grid-cols-[56px_repeat(7,1fr)] relative">
+            {/* Time labels column */}
+            <div>
+              {hours.map((hour) => (
+                <div key={hour} className="pr-2 text-[11px] text-muted-foreground text-right border-b border-border/40" style={{ height: HOUR_HEIGHT }}>
+                  <span className="-translate-y-2 inline-block">{hour}:00</span>
+                </div>
+              ))}
             </div>
-          ))}
+
+            {/* Day columns */}
+            {weekDays.map((day) => {
+              const dayAppts = getDayAppointments(day);
+
+              return (
+                <div key={day.toISOString()} className="border-l border-border/40 relative">
+                  {/* Hour cells (for click targets & grid lines) */}
+                  {hours.map((hour) => (
+                    <div
+                      key={hour}
+                      className="border-b border-border/40 group cursor-pointer hover:bg-secondary/30 transition-colors"
+                      style={{ height: HOUR_HEIGHT }}
+                      onClick={() => handleCellClick(day, hour)}
+                    >
+                      <div className="flex items-center justify-center h-full opacity-0 group-hover:opacity-100 transition-opacity">
+                        <Plus className="w-4 h-4 text-muted-foreground/40" />
+                      </div>
+                    </div>
+                  ))}
+
+                  {/* Appointments overlay */}
+                  {dayAppts.map((a) => {
+                    const aDate = new Date(a.date);
+                    const startHour = aDate.getHours() + aDate.getMinutes() / 60;
+                    const topPx = (startHour - START_HOUR) * HOUR_HEIGHT;
+                    const heightPx = (a.duration / 60) * HOUR_HEIGHT;
+                    const service = services.find(s => s.id === a.serviceId);
+                    const employee = employees.find(e => e.id === a.employeeId);
+                    const empColor = getEmployeeColor(a.employeeId, employees);
+
+                    // Don't render if outside visible range
+                    if (topPx < 0 || topPx >= hours.length * HOUR_HEIGHT) return null;
+
+                    return (
+                      <div
+                        key={a.id}
+                        onClick={(e) => handleAppointmentClick(e, a)}
+                        className={`absolute left-0.5 right-0.5 z-10 rounded-md px-2 py-1 text-xs cursor-pointer border-l-[3px] transition-all hover:shadow-md overflow-hidden ${empColor.bg} ${empColor.border} ${empColor.text}`}
+                        style={{ top: `${topPx}px`, height: `${Math.max(heightPx, 24)}px` }}
+                        title={`${a.clientName}${service ? ` – ${service.name}` : ''}${a.notes ? `\n${a.notes}` : ''}`}
+                      >
+                        <p className="font-bold truncate leading-tight">
+                          {a.clientName}
+                        </p>
+                        <p className="truncate opacity-70 leading-tight">
+                          {format(aDate, 'HH:mm')} · {service?.name || 'Wizyta'}
+                        </p>
+                        {heightPx > 40 && a.clientPhone && (
+                          <p className="truncate opacity-70 leading-tight">📞 {formatPhoneNumber(a.clientPhone)}</p>
+                        )}
+                        {heightPx > 56 && a.notes && (
+                          <p className="truncate opacity-60 leading-tight italic">📝 {a.notes}</p>
+                        )}
+                        {heightPx > 72 && employee && (
+                          <p className="truncate opacity-50 leading-tight">{employee.name}</p>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              );
+            })}
+          </div>
         </div>
       </div>
 

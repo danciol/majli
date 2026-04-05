@@ -11,6 +11,13 @@ import {
 } from '@/components/ui/dialog';
 import { Appointment, Service, Employee } from '@/data/services';
 
+export function formatPhoneNumber(value: string): string {
+  const digits = value.replace(/\D/g, '').slice(0, 9);
+  if (digits.length <= 3) return digits;
+  if (digits.length <= 6) return `${digits.slice(0, 3)}-${digits.slice(3)}`;
+  return `${digits.slice(0, 3)}-${digits.slice(3, 6)}-${digits.slice(6)}`;
+}
+
 interface AppointmentDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -41,7 +48,7 @@ const AppointmentDialog = ({
   useEffect(() => {
     if (appointment) {
       setClientName(appointment.clientName);
-      setClientPhone(appointment.clientPhone);
+      setClientPhone(formatPhoneNumber(appointment.clientPhone));
       setClientEmail(appointment.clientEmail);
       setServiceId(appointment.serviceId);
       setEmployeeId(appointment.employeeId);
@@ -75,7 +82,7 @@ const AppointmentDialog = ({
       serviceId,
       employeeId,
       clientName: clientName || 'Nowa wizyta',
-      clientPhone,
+      clientPhone: clientPhone.replace(/-/g, '').replace(/\s/g, ''),
       clientEmail,
       date: dateTime.toISOString(),
       duration: selectedService?.duration || duration,
@@ -89,9 +96,11 @@ const AppointmentDialog = ({
     onOpenChange(false);
   };
 
+  // Check both employeeIds and employees fields on service, plus employee.services
   const availableServices = employeeId
     ? services.filter(s => s.active !== false && (
         s.employeeIds?.includes(employeeId) ||
+        s.employees?.includes(employeeId) ||
         employees.find(e => e.id === employeeId)?.services?.includes(s.id)
       ))
     : services.filter(s => s.active !== false);
@@ -99,7 +108,8 @@ const AppointmentDialog = ({
   const matchedEmployees = serviceId
     ? employees.filter((employee) =>
         employee.services?.includes(serviceId) ||
-        selectedService?.employeeIds?.includes(employee.id)
+        selectedService?.employeeIds?.includes(employee.id) ||
+        selectedService?.employees?.includes(employee.id)
       )
     : employees;
 
@@ -131,7 +141,7 @@ const AppointmentDialog = ({
               setServiceId('');
             }}>
               <option value="">Wybierz pracownika</option>
-                {employees.map(e => (
+                {availableEmployees.map(e => (
                 <option key={e.id} value={e.id}>{e.name}</option>
                 ))}
             </NativeSelect>
@@ -147,10 +157,9 @@ const AppointmentDialog = ({
                 const svc = services.find(s => s.id === value);
                 if (svc) setDuration(svc.duration);
               }}
-              disabled={availableServices.length === 0}
             >
               <option value="">
-                {availableServices.length === 0 ? 'Brak usług dla wybranego pracownika' : 'Wybierz usługę'}
+                {employeeId && availableServices.length === 0 ? 'Brak usług dla wybranego pracownika' : 'Wybierz usługę'}
               </option>
               {availableServices.map(s => (
                 <option key={s.id} value={s.id}>
@@ -168,7 +177,12 @@ const AppointmentDialog = ({
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1.5">
               <Label htmlFor="appt-phone">Telefon</Label>
-              <Input id="appt-phone" placeholder="+48..." value={clientPhone} onChange={e => setClientPhone(e.target.value)} />
+              <Input
+                id="appt-phone"
+                placeholder="xxx-xxx-xxx"
+                value={clientPhone}
+                onChange={e => setClientPhone(formatPhoneNumber(e.target.value))}
+              />
             </div>
             <div className="space-y-1.5">
               <Label htmlFor="appt-email">Email</Label>
