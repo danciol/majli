@@ -21,7 +21,7 @@ const AdminServices = () => {
 
   const openNew = () => {
     setEditing(null);
-    setForm({ name: '', price: '', duration: '', employeeIds: [], selfBooking: true });
+    setForm({ name: '', price: '', duration: '', category: '', description: '', employeeIds: [], selfBooking: true });
     setDialogOpen(true);
   };
 
