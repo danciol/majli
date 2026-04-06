@@ -116,8 +116,8 @@ export function StepDateTime({ employee, serviceDuration, appointments, selected
       {/* Day pills */}
       <div className="grid grid-cols-7 gap-1 mb-4">
         {days.map(day => {
-          const dayKey = dayKeys[day.getDay()];
-          const hasHours = !!employee.workingHours[dayKey];
+          const dayHours = getDayHours(employee.workingHours, day.getDay());
+          const hasHours = !!dayHours && dayHours !== 'wolne';
           const isPast = day < today;
           const isSelected = pickedDate && isSameDay(day, pickedDate);
           const disabled = !hasHours || isPast;
