@@ -17,7 +17,7 @@ const AdminServices = () => {
   const { employees, loading: loadingE } = useEmployees();
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editing, setEditing] = useState<Service | null>(null);
-  const [form, setForm] = useState({ name: '', price: '', duration: '', employeeIds: [] as string[], selfBooking: true });
+  const [form, setForm] = useState({ name: '', price: '', duration: '', category: '', description: '', employeeIds: [] as string[], selfBooking: true });
 
   const openNew = () => {
     setEditing(null);
