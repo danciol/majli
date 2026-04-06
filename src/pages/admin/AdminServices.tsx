@@ -31,6 +31,7 @@ const AdminServices = () => {
       price: String(s.price),
       duration: String(s.duration),
       employeeIds: s.employees || s.employeeIds || [],
+      selfBooking: s.selfBooking !== false,
     });
     setDialogOpen(true);
   };
