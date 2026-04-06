@@ -105,6 +105,7 @@ const AdminServices = () => {
                 <p className="text-xs text-muted-foreground">
                   {s.duration} min · {s.price} zł
                   {getEmployeeNames(s) && ` · ${getEmployeeNames(s)}`}
+                  {s.selfBooking !== false && ' · 🌐 Online'}
                 </p>
               </div>
               <div className="flex gap-1">
