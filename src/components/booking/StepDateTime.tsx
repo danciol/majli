@@ -64,6 +64,7 @@ function generateSlots(employee: Employee, date: Date, duration: number, appoint
 }
 
 export function StepDateTime({ employee, serviceDuration, appointments, selectedDate, selectedTime, onSelect, onBack }: Props) {
+  console.log('Employee workingHours keys:', Object.keys(employee.workingHours), employee.workingHours);
   const today = startOfDay(new Date());
   const [weekOffset, setWeekOffset] = useState(0);
   const [pickedDate, setPickedDate] = useState<Date | null>(selectedDate);
