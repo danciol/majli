@@ -31,6 +31,8 @@ const AdminServices = () => {
       name: s.name,
       price: String(s.price),
       duration: String(s.duration),
+      category: s.category || '',
+      description: s.description || '',
       employeeIds: s.employees || s.employeeIds || [],
       selfBooking: s.selfBooking !== false,
     });
