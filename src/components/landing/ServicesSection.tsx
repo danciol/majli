@@ -13,7 +13,7 @@ export function ServicesSection({ onBookService }: Props) {
   const [activeCategory, setActiveCategory] = useState('manicure');
   const { services, loading } = useServices();
 
-  const filtered = services.filter(s => s.category === activeCategory && s.active !== false);
+  const filtered = services.filter(s => s.category === activeCategory && s.active !== false && s.selfBooking !== false);
 
   return (
     <section id="uslugi" className="py-20 md:py-28">

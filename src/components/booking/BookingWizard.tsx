@@ -100,7 +100,7 @@ export function BookingWizard({ onClose, initialServiceId }: BookingWizardProps)
               >
                 {step === 0 && (
                   <StepService
-                    services={services.filter(s => s.active !== false)}
+                    services={services.filter(s => s.active !== false && s.selfBooking !== false)}
                     selected={booking.service}
                     onSelect={(s) => { update({ service: s, employee: null, date: null, time: null }); setStep(1); }}
                   />
