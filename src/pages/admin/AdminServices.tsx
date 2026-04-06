@@ -140,6 +140,29 @@ const AdminServices = () => {
               <Label>Nazwa</Label>
               <Input value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} />
             </div>
+            <div>
+              <Label>Kategoria</Label>
+              <div className="flex flex-wrap gap-1.5 mt-1">
+                {categories.map(cat => (
+                  <button
+                    key={cat.id}
+                    type="button"
+                    onClick={() => setForm(f => ({ ...f, category: cat.id }))}
+                    className={`px-3 py-1.5 rounded-full text-xs font-medium transition-all ${
+                      form.category === cat.id
+                        ? 'bg-primary text-primary-foreground'
+                        : 'bg-secondary text-secondary-foreground hover:bg-secondary/80'
+                    }`}
+                  >
+                    <span className="mr-1">{cat.icon}</span>{cat.name}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div>
+              <Label>Opis</Label>
+              <Input value={form.description} onChange={e => setForm(f => ({ ...f, description: e.target.value }))} placeholder="Krótki opis usługi" />
+            </div>
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <Label>Cena (zł)</Label>
