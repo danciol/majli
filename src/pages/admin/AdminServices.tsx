@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import type { Service } from '@/data/services';
+import { categories } from '@/data/services';
 import { useServices, useEmployees } from '@/hooks/useFirestore';
 import { Plus, Edit2, Trash2, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
