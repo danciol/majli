@@ -109,6 +109,7 @@ const AdminServices = () => {
                 <p className="font-medium text-sm">{s.name}</p>
                 <p className="text-xs text-muted-foreground">
                   {s.duration} min · {s.price} zł
+                  {s.category && ` · ${categories.find(c => c.id === s.category)?.name || s.category}`}
                   {getEmployeeNames(s) && ` · ${getEmployeeNames(s)}`}
                   {s.selfBooking !== false && ' · 🌐 Online'}
                 </p>
