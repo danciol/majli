@@ -48,7 +48,7 @@ export function BookingWizard({ onClose, initialServiceId }: BookingWizardProps)
   const update = (data: Partial<BookingData>) => setBooking(prev => ({ ...prev, ...data }));
 
   const availableEmployees = booking.service
-    ? employees.filter(e => booking.service!.employeeIds.includes(e.id))
+    ? employees.filter(e => (booking.service!.employees || booking.service!.employeeIds || []).includes(e.id))
     : [];
 
   const slideVariants = {
