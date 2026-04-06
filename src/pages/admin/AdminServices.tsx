@@ -58,6 +58,8 @@ const AdminServices = () => {
         name: form.name,
         price: Number(form.price),
         duration: Number(form.duration),
+        category: form.category,
+        description: form.description,
         employees: form.employeeIds,
         selfBooking: form.selfBooking,
       };
