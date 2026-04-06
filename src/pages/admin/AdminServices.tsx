@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import type { Service } from '@/data/services';
+import { categories } from '@/data/services';
 import { useServices, useEmployees } from '@/hooks/useFirestore';
 import { Plus, Edit2, Trash2, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -16,11 +17,11 @@ const AdminServices = () => {
   const { employees, loading: loadingE } = useEmployees();
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editing, setEditing] = useState<Service | null>(null);
-  const [form, setForm] = useState({ name: '', price: '', duration: '', employeeIds: [] as string[], selfBooking: true });
+  const [form, setForm] = useState({ name: '', price: '', duration: '', category: '', description: '', employeeIds: [] as string[], selfBooking: true });
 
   const openNew = () => {
     setEditing(null);
-    setForm({ name: '', price: '', duration: '', employeeIds: [], selfBooking: true });
+    setForm({ name: '', price: '', duration: '', category: '', description: '', employeeIds: [], selfBooking: true });
     setDialogOpen(true);
   };
 
@@ -30,6 +31,8 @@ const AdminServices = () => {
       name: s.name,
       price: String(s.price),
       duration: String(s.duration),
+      category: s.category || '',
+      description: s.description || '',
       employeeIds: s.employees || s.employeeIds || [],
       selfBooking: s.selfBooking !== false,
     });
@@ -55,6 +58,8 @@ const AdminServices = () => {
         name: form.name,
         price: Number(form.price),
         duration: Number(form.duration),
+        category: form.category,
+        description: form.description,
         employees: form.employeeIds,
         selfBooking: form.selfBooking,
       };
@@ -104,6 +109,7 @@ const AdminServices = () => {
                 <p className="font-medium text-sm">{s.name}</p>
                 <p className="text-xs text-muted-foreground">
                   {s.duration} min · {s.price} zł
+                  {s.category && ` · ${categories.find(c => c.id === s.category)?.name || s.category}`}
                   {getEmployeeNames(s) && ` · ${getEmployeeNames(s)}`}
                   {s.selfBooking !== false && ' · 🌐 Online'}
                 </p>
@@ -134,6 +140,29 @@ const AdminServices = () => {
             <div>
               <Label>Nazwa</Label>
               <Input value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} />
+            </div>
+            <div>
+              <Label>Kategoria</Label>
+              <div className="flex flex-wrap gap-1.5 mt-1">
+                {categories.map(cat => (
+                  <button
+                    key={cat.id}
+                    type="button"
+                    onClick={() => setForm(f => ({ ...f, category: cat.id }))}
+                    className={`px-3 py-1.5 rounded-full text-xs font-medium transition-all ${
+                      form.category === cat.id
+                        ? 'bg-primary text-primary-foreground'
+                        : 'bg-secondary text-secondary-foreground hover:bg-secondary/80'
+                    }`}
+                  >
+                    <span className="mr-1">{cat.icon}</span>{cat.name}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div>
+              <Label>Opis</Label>
+              <Input value={form.description} onChange={e => setForm(f => ({ ...f, description: e.target.value }))} placeholder="Krótki opis usługi" />
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div>
