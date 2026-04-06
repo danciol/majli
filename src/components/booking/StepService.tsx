@@ -9,15 +9,33 @@ interface Props {
 }
 
 export function StepService({ services, selected, onSelect }: Props) {
-  const [activeCategory, setActiveCategory] = useState(categories[0].id);
-  const filtered = services.filter(s => s.category === activeCategory);
+  const [activeCategory, setActiveCategory] = useState<string>('all');
+
+  const filtered = activeCategory === 'all'
+    ? services
+    : services.filter(s => s.category === activeCategory);
+
+  // Only show categories that have services
+  const availableCategories = categories.filter(cat =>
+    services.some(s => s.category === cat.id)
+  );
 
   return (
     <div>
       <p className="text-muted-foreground text-sm mb-4">Wybierz usługę, którą chcesz zarezerwować</p>
 
       <div className="flex flex-wrap gap-1.5 mb-4">
-        {categories.map(cat => (
+        <button
+          onClick={() => setActiveCategory('all')}
+          className={`px-3 py-1.5 rounded-full text-xs font-medium transition-all ${
+            activeCategory === 'all'
+              ? 'bg-primary text-primary-foreground'
+              : 'bg-secondary text-secondary-foreground hover:bg-secondary/80'
+          }`}
+        >
+          Wszystkie
+        </button>
+        {availableCategories.map(cat => (
           <button
             key={cat.id}
             onClick={() => setActiveCategory(cat.id)}
@@ -46,7 +64,9 @@ export function StepService({ services, selected, onSelect }: Props) {
             <div className="flex justify-between items-start">
               <div className="flex-1 min-w-0">
                 <p className="font-medium text-sm text-foreground">{service.name}</p>
-                <p className="text-xs text-muted-foreground mt-0.5">{service.description}</p>
+                {service.description && (
+                  <p className="text-xs text-muted-foreground mt-0.5">{service.description}</p>
+                )}
                 <p className="text-xs text-muted-foreground flex items-center gap-1 mt-1.5">
                   <Clock size={11} /> {service.duration} min
                 </p>

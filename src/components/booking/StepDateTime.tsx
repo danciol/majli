@@ -15,11 +15,26 @@ interface Props {
   onBack: () => void;
 }
 
-const dayKeys: Record<number, string> = { 1: 'mon', 2: 'tue', 3: 'wed', 4: 'thu', 5: 'fri', 6: 'sat', 0: 'sun' };
+const dayKeys: Record<number, string[]> = {
+  1: ['mon', 'monday'],
+  2: ['tue', 'tuesday'],
+  3: ['wed', 'wednesday'],
+  4: ['thu', 'thursday'],
+  5: ['fri', 'friday'],
+  6: ['sat', 'saturday'],
+  0: ['sun', 'sunday'],
+};
+
+function getDayHours(workingHours: Employee['workingHours'], dayOfWeek: number) {
+  const keys = dayKeys[dayOfWeek];
+  for (const key of keys) {
+    if (workingHours[key]) return workingHours[key];
+  }
+  return undefined;
+}
 
 function generateSlots(employee: Employee, date: Date, duration: number, appointments: Appointment[]): string[] {
-  const dayKey = dayKeys[date.getDay()];
-  const hours = employee.workingHours[dayKey];
+  const hours = getDayHours(employee.workingHours, date.getDay());
   if (!hours) return [];
 
   let startStr: string, endStr: string;
@@ -100,8 +115,8 @@ export function StepDateTime({ employee, serviceDuration, appointments, selected
       {/* Day pills */}
       <div className="grid grid-cols-7 gap-1 mb-4">
         {days.map(day => {
-          const dayKey = dayKeys[day.getDay()];
-          const hasHours = !!employee.workingHours[dayKey];
+          const dayHours = getDayHours(employee.workingHours, day.getDay());
+          const hasHours = !!dayHours && dayHours !== 'wolne';
           const isPast = day < today;
           const isSelected = pickedDate && isSameDay(day, pickedDate);
           const disabled = !hasHours || isPast;
