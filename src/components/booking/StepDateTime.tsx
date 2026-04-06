@@ -15,7 +15,23 @@ interface Props {
   onBack: () => void;
 }
 
-const dayKeys: Record<number, string> = { 1: 'mon', 2: 'tue', 3: 'wed', 4: 'thu', 5: 'fri', 6: 'sat', 0: 'sun' };
+const dayKeys: Record<number, string[]> = {
+  1: ['mon', 'monday'],
+  2: ['tue', 'tuesday'],
+  3: ['wed', 'wednesday'],
+  4: ['thu', 'thursday'],
+  5: ['fri', 'friday'],
+  6: ['sat', 'saturday'],
+  0: ['sun', 'sunday'],
+};
+
+function getDayHours(workingHours: Employee['workingHours'], dayOfWeek: number) {
+  const keys = dayKeys[dayOfWeek];
+  for (const key of keys) {
+    if (workingHours[key]) return workingHours[key];
+  }
+  return undefined;
+}
 
 function generateSlots(employee: Employee, date: Date, duration: number, appointments: Appointment[]): string[] {
   const dayKey = dayKeys[date.getDay()];
