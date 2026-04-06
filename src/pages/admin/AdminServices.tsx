@@ -56,6 +56,7 @@ const AdminServices = () => {
         price: Number(form.price),
         duration: Number(form.duration),
         employees: form.employeeIds,
+        selfBooking: form.selfBooking,
       };
       if (editing) {
         await updateService(editing.id, data);
