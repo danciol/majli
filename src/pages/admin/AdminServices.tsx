@@ -16,11 +16,11 @@ const AdminServices = () => {
   const { employees, loading: loadingE } = useEmployees();
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editing, setEditing] = useState<Service | null>(null);
-  const [form, setForm] = useState({ name: '', price: '', duration: '', employeeIds: [] as string[] });
+  const [form, setForm] = useState({ name: '', price: '', duration: '', employeeIds: [] as string[], selfBooking: true });
 
   const openNew = () => {
     setEditing(null);
-    setForm({ name: '', price: '', duration: '', employeeIds: [] });
+    setForm({ name: '', price: '', duration: '', employeeIds: [], selfBooking: true });
     setDialogOpen(true);
   };
 
@@ -31,6 +31,7 @@ const AdminServices = () => {
       price: String(s.price),
       duration: String(s.duration),
       employeeIds: s.employees || s.employeeIds || [],
+      selfBooking: s.selfBooking !== false,
     });
     setDialogOpen(true);
   };
@@ -55,6 +56,7 @@ const AdminServices = () => {
         price: Number(form.price),
         duration: Number(form.duration),
         employees: form.employeeIds,
+        selfBooking: form.selfBooking,
       };
       if (editing) {
         await updateService(editing.id, data);
@@ -103,6 +105,7 @@ const AdminServices = () => {
                 <p className="text-xs text-muted-foreground">
                   {s.duration} min · {s.price} zł
                   {getEmployeeNames(s) && ` · ${getEmployeeNames(s)}`}
+                  {s.selfBooking !== false && ' · 🌐 Online'}
                 </p>
               </div>
               <div className="flex gap-1">
@@ -156,6 +159,16 @@ const AdminServices = () => {
                 ))}
                 {employees.length === 0 && <p className="text-xs text-muted-foreground">Brak pracowników</p>}
               </div>
+            </div>
+            <div>
+              <label className="flex items-center gap-2 cursor-pointer">
+                <Checkbox
+                  checked={form.selfBooking}
+                  onCheckedChange={(checked) => setForm(f => ({ ...f, selfBooking: !!checked }))}
+                />
+                <span className="text-sm">Klient może sam się umówić online</span>
+              </label>
+              <p className="text-xs text-muted-foreground mt-1">Usługa będzie widoczna w rezerwacji online na stronie</p>
             </div>
             <Button onClick={handleSave} className="w-full bg-primary text-primary-foreground">
               {editing ? 'Zapisz zmiany' : 'Dodaj usługę'}

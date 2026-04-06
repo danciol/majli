@@ -8,6 +8,7 @@ export interface Service {
   employeeIds?: string[];
   employees?: string[];
   active?: boolean;
+  selfBooking?: boolean;
 }
 
 export interface Employee {
