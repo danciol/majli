@@ -20,7 +20,7 @@ const AdminServices = () => {
 
   const openNew = () => {
     setEditing(null);
-    setForm({ name: '', price: '', duration: '', employeeIds: [] });
+    setForm({ name: '', price: '', duration: '', employeeIds: [], selfBooking: true });
     setDialogOpen(true);
   };
 
