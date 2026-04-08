@@ -58,9 +58,10 @@ export function StepConfirmation({ booking, onClose }: Props) {
 
       setSaved(true);
       toast.success('Wizyta zgłoszona — czeka na potwierdzenie salonu!');
-    } catch {
-      toast.error('Błąd rezerwacji. Spróbuj ponownie.');
-    }
+  } catch (err) {
+  console.error('BŁĄD REZERWACJI:', err);
+  toast.error('Błąd rezerwacji. Spróbuj ponownie.');
+}
     setSaving(false);
   };
 
