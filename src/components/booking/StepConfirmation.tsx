@@ -39,9 +39,9 @@ export function StepConfirmation({ booking, onClose }: Props) {
         duration: booking.service.duration,
         status: 'pending',
         createdAt: new Date().toISOString(),
-        depositAmount: depositAmount || undefined,
-        depositStatus: depositPaid ? 'paid' : 'none',
-        depositOrderId: booking.depositOrderId || undefined,
+        ...(depositAmount > 0 && { depositAmount }),
+        ...(depositPaid && { depositStatus: 'paid' }),
+        ...(booking.depositOrderId && { depositOrderId: booking.depositOrderId }),
       });
 
       const clientsSnap = await getDocs(
@@ -58,10 +58,9 @@ export function StepConfirmation({ booking, onClose }: Props) {
 
       setSaved(true);
       toast.success('Wizyta zgłoszona — czeka na potwierdzenie salonu!');
-  } catch (err) {
-  console.error('BŁĄD REZERWACJI:', err);
-  toast.error('Błąd rezerwacji. Spróbuj ponownie.');
-}
+    } catch {
+      toast.error('Błąd rezerwacji. Spróbuj ponownie.');
+    }
     setSaving(false);
   };
 
