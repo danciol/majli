@@ -1,11 +1,13 @@
 import { useMemo, useState } from 'react';
-import { Calendar, Users, Scissors, Clock, TrendingUp, Loader2, Database } from 'lucide-react';
+import { Calendar, Users, Scissors, Clock, TrendingUp, Loader2, Database, AlertCircle, CheckCircle, X } from 'lucide-react';
 import { useAppointments, useServices, useEmployees } from '@/hooks/useFirestore';
 import { format } from 'date-fns';
 import { pl } from 'date-fns/locale';
 import { Button } from '@/components/ui/button';
 import { seedFirestore } from '@/lib/seedFirestore';
 import { toast } from 'sonner';
+import { Link } from 'react-router-dom';
+import type { Appointment } from '@/data/services';
 
 const statusLabels: Record<string, string> = {
   pending: 'Oczekuje',
@@ -21,11 +23,19 @@ const statusColors: Record<string, string> = {
   completed: 'bg-green-100 text-green-700',
 };
 
+const depositLabels: Record<string, string> = {
+  none: '',
+  pending: '💳 Zaliczka oczekuje',
+  paid: '✅ Zaliczka zapłacona',
+  refunded: '↩️ Zwrócona',
+};
+
 const AdminDashboard = () => {
-  const { appointments, loading: loadingA } = useAppointments();
+  const { appointments, loading: loadingA, updateAppointment } = useAppointments();
   const { services, loading: loadingS } = useServices();
   const { employees, loading: loadingE } = useEmployees();
   const [seeding, setSeeding] = useState(false);
+  const [updatingId, setUpdatingId] = useState<string | null>(null);
 
   const loading = loadingA || loadingS || loadingE;
   const today = new Date();
@@ -36,12 +46,31 @@ const AdminDashboard = () => {
     [appointments, todayStr]
   );
 
+  const pendingAppointments = useMemo(
+    () => [...appointments]
+      .filter(a => a.status === 'pending')
+      .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()),
+    [appointments]
+  );
+
   const stats = [
     { label: 'Wizyty dziś', value: todayAppointments.length, icon: Calendar, color: 'text-primary' },
-    { label: 'Usługi', value: services.length, icon: Scissors, color: 'text-accent' },
+    { label: 'Do potwierdzenia', value: pendingAppointments.length, icon: AlertCircle, color: 'text-destructive' },
     { label: 'Pracownicy', value: employees.length, icon: Users, color: 'text-gold' },
     { label: 'Wszystkie wizyty', value: appointments.length, icon: TrendingUp, color: 'text-green-600' },
   ];
+
+  const handleStatus = async (id: string, status: Appointment['status']) => {
+    setUpdatingId(id);
+    try {
+      await updateAppointment(id, { status });
+      toast.success(`Wizyta ${status === 'confirmed' ? 'potwierdzona' : 'anulowana'}`);
+    } catch {
+      toast.error('Błąd zmiany statusu');
+    } finally {
+      setUpdatingId(null);
+    }
+  };
 
   if (loading) return <div className="flex items-center justify-center py-20"><Loader2 className="w-6 h-6 animate-spin text-primary" /></div>;
 
@@ -75,6 +104,7 @@ const AdminDashboard = () => {
         )}
       </div>
 
+      {/* Statystyki */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         {stats.map((s) => (
           <div key={s.label} className="glass-card p-5">
@@ -87,6 +117,79 @@ const AdminDashboard = () => {
         ))}
       </div>
 
+      {/* Sekcja: Do potwierdzenia */}
+      {pendingAppointments.length > 0 && (
+        <div className="glass-card p-6 border border-destructive/20">
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="font-heading text-lg font-semibold flex items-center gap-2">
+              <AlertCircle className="w-5 h-5 text-destructive" />
+              Do potwierdzenia
+              <span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-destructive text-destructive-foreground text-[10px] font-bold">
+                {pendingAppointments.length}
+              </span>
+            </h2>
+            <Link to="/admin/wizyty" className="text-xs text-primary hover:underline">
+              Zobacz wszystkie →
+            </Link>
+          </div>
+          <div className="space-y-3">
+            {pendingAppointments.slice(0, 5).map((appt) => {
+              const service = services.find(s => s.id === appt.serviceId);
+              const employee = employees.find(e => e.id === appt.employeeId);
+              const isUpdating = updatingId === appt.id;
+              return (
+                <div key={appt.id} className="flex items-center justify-between p-4 rounded-lg bg-secondary/50 hover:bg-secondary/80 transition-colors gap-3">
+                  <div className="flex items-center gap-4 min-w-0">
+                    <div className="text-center min-w-[50px] shrink-0">
+                      <p className="text-xs text-muted-foreground">{format(new Date(appt.date), 'd MMM', { locale: pl })}</p>
+                      <p className="text-sm font-bold">{format(new Date(appt.date), 'HH:mm')}</p>
+                    </div>
+                    <div className="min-w-0">
+                      <p className="font-medium text-sm truncate">{appt.clientName}</p>
+                      <p className="text-xs text-muted-foreground truncate">
+                        {service?.name} · {employee?.name}
+                      </p>
+                      {appt.depositStatus === 'paid' && (
+                        <p className="text-xs text-green-600 font-medium">✅ Zaliczka {appt.depositAmount} zł</p>
+                      )}
+                    </div>
+                  </div>
+                  <div className="flex gap-1 shrink-0">
+                    {isUpdating ? (
+                      <Loader2 className="w-4 h-4 animate-spin text-primary" />
+                    ) : (
+                      <>
+                        <Button
+                          variant="ghost" size="icon" className="h-8 w-8 text-primary hover:text-primary hover:bg-primary/10"
+                          title="Potwierdź"
+                          onClick={() => handleStatus(appt.id, 'confirmed')}
+                        >
+                          <CheckCircle className="w-4 h-4" />
+                        </Button>
+                        <Button
+                          variant="ghost" size="icon" className="h-8 w-8 text-destructive hover:text-destructive hover:bg-destructive/10"
+                          title="Anuluj"
+                          onClick={() => handleStatus(appt.id, 'cancelled')}
+                        >
+                          <X className="w-4 h-4" />
+                        </Button>
+                      </>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+            {pendingAppointments.length > 5 && (
+              <p className="text-xs text-center text-muted-foreground pt-1">
+                i jeszcze {pendingAppointments.length - 5} więcej...{' '}
+                <Link to="/admin/wizyty" className="text-primary hover:underline">Zobacz wszystkie</Link>
+              </p>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Dzisiejsze wizyty */}
       <div className="glass-card p-6">
         <h2 className="font-heading text-lg font-semibold mb-4 flex items-center gap-2">
           <Clock className="w-5 h-5 text-primary" />
@@ -108,7 +211,8 @@ const AdminDashboard = () => {
                     <div>
                       <p className="font-medium text-sm">{appt.clientName}</p>
                       <p className="text-xs text-muted-foreground">
-                        {service?.name} &middot; {employee?.name} &middot; {appt.duration} min
+                        {service?.name} · {employee?.name} · {appt.duration} min
+                        {appt.depositStatus === 'paid' && ' · ✅ zaliczka'}
                       </p>
                     </div>
                   </div>

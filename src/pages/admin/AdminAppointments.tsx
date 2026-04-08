@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { NativeSelect } from '@/components/ui/native-select';
 import type { Appointment } from '@/data/services';
-import { CheckCircle, X, Loader2, Search } from 'lucide-react';
+import { CheckCircle, X, Loader2, Search, MessageSquare } from 'lucide-react';
 import { toast } from 'sonner';
 
 const statusLabels: Record<Appointment['status'], string> = {
@@ -195,6 +195,18 @@ const AdminAppointments = () => {
                         </div>
                       ) : (
                         <div className="flex justify-end gap-1">
+                          <Button
+                            variant="ghost" size="icon" className="h-7 w-7" title="Wyślij SMS przypomnienie"
+                            disabled={!appt.clientPhone}
+                            onClick={() => {
+                              const date = format(new Date(appt.date), "d MMM 'o' HH:mm", { locale: pl });
+                              const service = serviceMap.get(appt.serviceId);
+                              const text = `Przypomnienie: wizyta w salonie Majli Beauty ${date} (${service?.name || 'wizyta'}). Do zobaczenia! 💅`;
+                              window.open(`sms:${appt.clientPhone}?body=${encodeURIComponent(text)}`, '_blank');
+                            }}
+                          >
+                            <MessageSquare className="w-3.5 h-3.5 text-blue-500" />
+                          </Button>
                           <Button variant="ghost" size="icon" className="h-7 w-7" title="Potwierdź" disabled={appt.status === 'confirmed'} onClick={() => handleStatusChange(appt.id, 'confirmed')}>
                             <CheckCircle className="w-3.5 h-3.5 text-primary" />
                           </Button>

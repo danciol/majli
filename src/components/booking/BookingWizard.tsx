@@ -4,6 +4,7 @@ import { StepService } from './StepService';
 import { StepEmployee } from './StepEmployee';
 import { StepDateTime } from './StepDateTime';
 import { StepClientForm } from './StepClientForm';
+import { StepPayment } from './StepPayment';
 import { StepConfirmation } from './StepConfirmation';
 import { Service, Employee } from '@/data/services';
 import { useServices, useEmployees, useAppointments } from '@/hooks/useFirestore';
@@ -17,6 +18,7 @@ export interface BookingData {
   clientName: string;
   clientPhone: string;
   clientEmail: string;
+  depositOrderId?: string;
 }
 
 interface BookingWizardProps {
@@ -24,7 +26,7 @@ interface BookingWizardProps {
   initialServiceId?: string;
 }
 
-const stepLabels = ['Usługa', 'Pracownik', 'Termin', 'Dane', 'Potwierdzenie'];
+const stepLabels = ['Usługa', 'Pracownik', 'Termin', 'Dane', 'Płatność'];
 
 export function BookingWizard({ onClose, initialServiceId }: BookingWizardProps) {
   const { services, loading: loadingS } = useServices();
@@ -51,11 +53,16 @@ export function BookingWizard({ onClose, initialServiceId }: BookingWizardProps)
     ? employees.filter(e => (booking.service!.employees || booking.service!.employeeIds || []).includes(e.id))
     : [];
 
+  const depositAmount = booking.service?.depositAmount ?? 0;
+  const requiresDeposit = depositAmount > 0;
+
   const slideVariants = {
     enter: { opacity: 0, x: 40 },
     center: { opacity: 1, x: 0 },
     exit: { opacity: 0, x: -40 },
   };
+
+  const visibleSteps = requiresDeposit ? stepLabels : stepLabels.filter(l => l !== 'Płatność');
 
   return (
     <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
@@ -68,10 +75,10 @@ export function BookingWizard({ onClose, initialServiceId }: BookingWizardProps)
           </button>
         </div>
 
-        {step < 4 && (
+        {step < (requiresDeposit ? 5 : 4) && (
           <div className="px-5 pt-4">
             <div className="flex items-center gap-1">
-              {stepLabels.slice(0, 4).map((label, i) => (
+              {visibleSteps.map((label, i) => (
                 <div key={i} className="flex-1">
                   <div className={`h-1.5 rounded-full transition-colors ${i <= step ? 'bg-primary' : 'bg-border'}`} />
                   <p className={`text-[10px] mt-1 text-center transition-colors ${i <= step ? 'text-primary font-medium' : 'text-muted-foreground'}`}>
@@ -127,11 +134,25 @@ export function BookingWizard({ onClose, initialServiceId }: BookingWizardProps)
                 {step === 3 && (
                   <StepClientForm
                     booking={booking}
-                    onSubmit={(data) => { update(data); setStep(4); }}
+                    onSubmit={(data) => {
+                      update(data);
+                      setStep(requiresDeposit ? 4 : 5);
+                    }}
                     onBack={() => setStep(2)}
                   />
                 )}
-                {step === 4 && (
+                {step === 4 && requiresDeposit && (
+                  <StepPayment
+                    booking={booking}
+                    depositAmount={depositAmount}
+                    onPaymentSuccess={(orderId) => {
+                      update({ depositOrderId: orderId });
+                      setStep(5);
+                    }}
+                    onBack={() => setStep(3)}
+                  />
+                )}
+                {step === 5 && (
                   <StepConfirmation booking={booking} onClose={onClose} />
                 )}
               </motion.div>

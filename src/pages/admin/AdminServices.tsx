@@ -17,11 +17,11 @@ const AdminServices = () => {
   const { employees, loading: loadingE } = useEmployees();
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editing, setEditing] = useState<Service | null>(null);
-  const [form, setForm] = useState({ name: '', price: '', duration: '', category: '', description: '', employeeIds: [] as string[], selfBooking: true });
+  const [form, setForm] = useState({ name: '', price: '', duration: '', category: '', description: '', employeeIds: [] as string[], selfBooking: true, depositAmount: '' });
 
   const openNew = () => {
     setEditing(null);
-    setForm({ name: '', price: '', duration: '', category: '', description: '', employeeIds: [], selfBooking: true });
+    setForm({ name: '', price: '', duration: '', category: '', description: '', employeeIds: [], selfBooking: true, depositAmount: '' });
     setDialogOpen(true);
   };
 
@@ -35,6 +35,7 @@ const AdminServices = () => {
       description: s.description || '',
       employeeIds: s.employees || s.employeeIds || [],
       selfBooking: s.selfBooking !== false,
+      depositAmount: s.depositAmount ? String(s.depositAmount) : '',
     });
     setDialogOpen(true);
   };
@@ -62,6 +63,7 @@ const AdminServices = () => {
         description: form.description,
         employees: form.employeeIds,
         selfBooking: form.selfBooking,
+        depositAmount: form.depositAmount ? Number(form.depositAmount) : 0,
       };
       if (editing) {
         await updateService(editing.id, data);
@@ -109,6 +111,7 @@ const AdminServices = () => {
                 <p className="font-medium text-sm">{s.name}</p>
                 <p className="text-xs text-muted-foreground">
                   {s.duration} min · {s.price} zł
+                  {s.depositAmount ? ` · 💳 zaliczka ${s.depositAmount} zł` : ''}
                   {s.category && ` · ${categories.find(c => c.id === s.category)?.name || s.category}`}
                   {getEmployeeNames(s) && ` · ${getEmployeeNames(s)}`}
                   {s.selfBooking !== false && ' · 🌐 Online'}
@@ -173,6 +176,19 @@ const AdminServices = () => {
                 <Label>Czas (min)</Label>
                 <Input type="number" value={form.duration} onChange={e => setForm(f => ({ ...f, duration: e.target.value }))} />
               </div>
+            </div>
+            <div>
+              <Label>Zaliczka (zł) — 0 lub puste = brak zaliczki</Label>
+              <Input
+                type="number"
+                min="0"
+                value={form.depositAmount}
+                onChange={e => setForm(f => ({ ...f, depositAmount: e.target.value }))}
+                placeholder="np. 50"
+              />
+              <p className="text-xs text-muted-foreground mt-1">
+                Klient będzie musiał zapłacić tę kwotę online, aby zarezerwować wizytę
+              </p>
             </div>
             <div>
               <Label className="mb-2 block">Przypisani pracownicy</Label>

@@ -9,6 +9,7 @@ export interface Service {
   employees?: string[];
   active?: boolean;
   selfBooking?: boolean;
+  depositAmount?: number; // zaliczka w zł (0 = brak zaliczki)
 }
 
 export interface Employee {
@@ -37,6 +38,9 @@ export interface Appointment {
   googleCalendarEventId?: string;
   notes?: string;
   createdAt: string;
+  depositAmount?: number;         // wymagana zaliczka w zł
+  depositStatus?: 'none' | 'pending' | 'paid' | 'refunded';
+  depositOrderId?: string;        // ID zamówienia P24 (sandbox lub live)
 }
 
 export interface Client {

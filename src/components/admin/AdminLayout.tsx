@@ -1,15 +1,17 @@
 import { Outlet, Link, useLocation, useNavigate, Navigate } from 'react-router-dom';
 import {
-  LayoutDashboard, Calendar, Scissors, Users, ClipboardList, LogOut, Menu, X, UserCheck,
+  LayoutDashboard, Calendar, Scissors, Users, ClipboardList, LogOut, Menu, X, UserCheck, MessageSquare,
 } from 'lucide-react';
 import { useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
+import { useAppointments } from '@/hooks/useFirestore';
 
 const allLinks = [
   { to: '/admin', label: 'Dashboard', icon: LayoutDashboard, roles: ['admin', 'pracownik'] },
   { to: '/admin/kalendarz', label: 'Kalendarz', icon: Calendar, roles: ['admin', 'pracownik'] },
   { to: '/admin/wizyty', label: 'Wizyty', icon: ClipboardList, roles: ['admin'] },
   { to: '/admin/klienci', label: 'Klienci', icon: UserCheck, roles: ['admin'] },
+  { to: '/admin/wiadomosci', label: 'Wiadomości', icon: MessageSquare, roles: ['admin'] },
   { to: '/admin/uslugi', label: 'Usługi', icon: Scissors, roles: ['admin'] },
   { to: '/admin/pracownicy', label: 'Pracownicy', icon: Users, roles: ['admin'] },
 ];
@@ -18,6 +20,7 @@ export function AdminLayout() {
   const location = useLocation();
   const navigate = useNavigate();
   const { isAuthenticated, employee, logout, loading } = useAuth();
+  const { appointments } = useAppointments();
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
   if (loading) return <div className="min-h-screen flex items-center justify-center"><span className="text-muted-foreground">Ładowanie...</span></div>;
@@ -25,6 +28,9 @@ export function AdminLayout() {
 
   const role = employee?.role || 'pracownik';
   const links = allLinks.filter(l => l.roles.includes(role));
+
+  // Liczba wizyt oczekujących na potwierdzenie
+  const pendingCount = appointments.filter(a => a.status === 'pending').length;
 
   const handleLogout = () => {
     logout();
@@ -49,6 +55,7 @@ export function AdminLayout() {
         <nav className="p-3 space-y-1">
           {links.map((link) => {
             const active = location.pathname === link.to;
+            const isWizyty = link.to === '/admin/wizyty';
             return (
               <Link
                 key={link.to}
@@ -61,7 +68,12 @@ export function AdminLayout() {
                 }`}
               >
                 <link.icon className="w-4 h-4" />
-                {link.label}
+                <span className="flex-1">{link.label}</span>
+                {isWizyty && pendingCount > 0 && (
+                  <span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-destructive text-destructive-foreground text-[10px] font-bold">
+                    {pendingCount > 9 ? '9+' : pendingCount}
+                  </span>
+                )}
               </Link>
             );
           })}
@@ -95,6 +107,17 @@ export function AdminLayout() {
             <Menu className="w-5 h-5" />
           </button>
           <span className="text-sm text-muted-foreground font-medium">Panel Administracyjny</span>
+          {pendingCount > 0 && (
+            <Link
+              to="/admin/wizyty"
+              className="ml-auto flex items-center gap-2 text-xs font-medium text-destructive hover:underline"
+            >
+              <span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-destructive text-destructive-foreground text-[10px] font-bold">
+                {pendingCount > 9 ? '9+' : pendingCount}
+              </span>
+              {pendingCount === 1 ? 'wizyta czeka na potwierdzenie' : `wizyty czekają na potwierdzenie`}
+            </Link>
+          )}
         </header>
         <main className="flex-1 p-4 md:p-6 overflow-auto">
           <Outlet />
