@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
-import { Calendar, Users, Scissors, Clock, TrendingUp, Loader2, Database, AlertCircle, CheckCircle, X } from 'lucide-react';
+import { Calendar, Users, Clock, TrendingUp, Loader2, Database, AlertCircle, CheckCircle, X, MessageSquare } from 'lucide-react';
 import { useAppointments, useServices, useEmployees } from '@/hooks/useFirestore';
-import { format } from 'date-fns';
+import { format, addDays } from 'date-fns';
 import { pl } from 'date-fns/locale';
 import { Button } from '@/components/ui/button';
 import { seedFirestore } from '@/lib/seedFirestore';
@@ -40,10 +40,21 @@ const AdminDashboard = () => {
   const loading = loadingA || loadingS || loadingE;
   const today = new Date();
   const todayStr = format(today, 'yyyy-MM-dd');
+  const tomorrow = addDays(today, 1);
+  const tomorrowStr = format(tomorrow, 'yyyy-MM-dd');
 
   const todayAppointments = useMemo(
-    () => appointments.filter(a => a.date.startsWith(todayStr)),
+    () => [...appointments]
+      .filter(a => a.date.startsWith(todayStr))
+      .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()),
     [appointments, todayStr]
+  );
+
+  const tomorrowAppointments = useMemo(
+    () => [...appointments]
+      .filter(a => a.date.startsWith(tomorrowStr) && a.status !== 'cancelled')
+      .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()),
+    [appointments, tomorrowStr]
   );
 
   const pendingAppointments = useMemo(
@@ -55,10 +66,18 @@ const AdminDashboard = () => {
 
   const stats = [
     { label: 'Wizyty dziś', value: todayAppointments.length, icon: Calendar, color: 'text-primary' },
+    { label: 'Jutro', value: tomorrowAppointments.length, icon: Clock, color: 'text-blue-500' },
     { label: 'Do potwierdzenia', value: pendingAppointments.length, icon: AlertCircle, color: 'text-destructive' },
-    { label: 'Pracownicy', value: employees.length, icon: Users, color: 'text-gold' },
     { label: 'Wszystkie wizyty', value: appointments.length, icon: TrendingUp, color: 'text-green-600' },
   ];
+
+  const sendSmsReminder = (appt: Appointment) => {
+    if (!appt.clientPhone) { toast.error('Brak numeru telefonu'); return; }
+    const service = services.find(s => s.id === appt.serviceId);
+    const date = format(new Date(appt.date), "d MMMM 'o godz.' HH:mm", { locale: pl });
+    const text = `Przypomnienie: wizyta w salonie Majli Beauty ${date} (${service?.name || 'wizyta'}). Do zobaczenia! 💅`;
+    window.open(`sms:${appt.clientPhone}?body=${encodeURIComponent(text)}`, '_blank');
+  };
 
   const handleStatus = async (id: string, status: Appointment['status']) => {
     setUpdatingId(id);
@@ -189,6 +208,72 @@ const AdminDashboard = () => {
         </div>
       )}
 
+      {/* Jutrzejsze wizyty */}
+      <div className="glass-card p-6">
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="font-heading text-lg font-semibold flex items-center gap-2">
+            <Clock className="w-5 h-5 text-blue-500" />
+            Jutrzejsze wizyty
+            <span className="text-sm font-normal text-muted-foreground">
+              ({format(tomorrow, 'd MMMM', { locale: pl })})
+            </span>
+          </h2>
+          {tomorrowAppointments.length > 0 && (
+            <button
+              onClick={() => {
+                tomorrowAppointments.forEach(appt => {
+                  if (appt.clientPhone) sendSmsReminder(appt);
+                });
+                toast.success(`Otwarto SMS dla ${tomorrowAppointments.filter(a => a.clientPhone).length} klientek`);
+              }}
+              className="flex items-center gap-1.5 text-xs font-medium text-blue-500 hover:text-blue-600 hover:underline"
+            >
+              <MessageSquare className="w-3.5 h-3.5" />
+              Wyślij przypomnienia do wszystkich
+            </button>
+          )}
+        </div>
+        {tomorrowAppointments.length === 0 ? (
+          <p className="text-muted-foreground text-sm py-8 text-center">Brak wizyt na jutro</p>
+        ) : (
+          <div className="space-y-3">
+            {tomorrowAppointments.map((appt) => {
+              const service = services.find(s => s.id === appt.serviceId);
+              const employee = employees.find(e => e.id === appt.employeeId);
+              return (
+                <div key={appt.id} className="flex items-center justify-between p-4 rounded-lg bg-secondary/50 hover:bg-secondary/80 transition-colors gap-3">
+                  <div className="flex items-center gap-4 min-w-0">
+                    <div className="text-center min-w-[50px] shrink-0">
+                      <p className="text-sm font-bold">{format(new Date(appt.date), 'HH:mm')}</p>
+                    </div>
+                    <div className="min-w-0">
+                      <p className="font-medium text-sm truncate">{appt.clientName}</p>
+                      <p className="text-xs text-muted-foreground truncate">
+                        {service?.name} · {employee?.name} · {appt.duration} min
+                        {appt.depositStatus === 'paid' && ' · ✅ zaliczka'}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2 shrink-0">
+                    <span className={`text-xs px-2 py-1 rounded-full font-medium ${statusColors[appt.status]}`}>
+                      {statusLabels[appt.status]}
+                    </span>
+                    <Button
+                      variant="ghost" size="icon" className="h-8 w-8 text-blue-500 hover:text-blue-600 hover:bg-blue-50"
+                      title="Wyślij SMS przypomnienie"
+                      disabled={!appt.clientPhone}
+                      onClick={() => sendSmsReminder(appt)}
+                    >
+                      <MessageSquare className="w-4 h-4" />
+                    </Button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+
       {/* Dzisiejsze wizyty */}
       <div className="glass-card p-6">
         <h2 className="font-heading text-lg font-semibold mb-4 flex items-center gap-2">
@@ -203,20 +288,20 @@ const AdminDashboard = () => {
               const service = services.find(s => s.id === appt.serviceId);
               const employee = employees.find(e => e.id === appt.employeeId);
               return (
-                <div key={appt.id} className="flex items-center justify-between p-4 rounded-lg bg-secondary/50 hover:bg-secondary/80 transition-colors">
-                  <div className="flex items-center gap-4">
-                    <div className="text-center min-w-[50px]">
+                <div key={appt.id} className="flex items-center justify-between p-4 rounded-lg bg-secondary/50 hover:bg-secondary/80 transition-colors gap-3">
+                  <div className="flex items-center gap-4 min-w-0">
+                    <div className="text-center min-w-[50px] shrink-0">
                       <p className="text-sm font-bold">{format(new Date(appt.date), 'HH:mm')}</p>
                     </div>
-                    <div>
-                      <p className="font-medium text-sm">{appt.clientName}</p>
-                      <p className="text-xs text-muted-foreground">
+                    <div className="min-w-0">
+                      <p className="font-medium text-sm truncate">{appt.clientName}</p>
+                      <p className="text-xs text-muted-foreground truncate">
                         {service?.name} · {employee?.name} · {appt.duration} min
                         {appt.depositStatus === 'paid' && ' · ✅ zaliczka'}
                       </p>
                     </div>
                   </div>
-                  <span className={`text-xs px-3 py-1 rounded-full font-medium ${statusColors[appt.status]}`}>
+                  <span className={`text-xs px-3 py-1 rounded-full font-medium shrink-0 ${statusColors[appt.status]}`}>
                     {statusLabels[appt.status]}
                   </span>
                 </div>
