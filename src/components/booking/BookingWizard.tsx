@@ -7,7 +7,7 @@ import { StepClientForm } from './StepClientForm';
 import { StepPayment } from './StepPayment';
 import { StepConfirmation } from './StepConfirmation';
 import { Service, Employee } from '@/data/services';
-import { useServices, useEmployees, useAppointments } from '@/hooks/useFirestore';
+import { useServices, useEmployees, useAppointments, useSettings } from '@/hooks/useFirestore';
 import { X, Loader2 } from 'lucide-react';
 
 export interface BookingData {
@@ -32,8 +32,9 @@ export function BookingWizard({ onClose, initialServiceId }: BookingWizardProps)
   const { services, loading: loadingS } = useServices();
   const { employees, loading: loadingE } = useEmployees();
   const { appointments, loading: loadingA } = useAppointments();
+  const { depositAmount, loading: loadingSettings } = useSettings();
 
-  const loading = loadingS || loadingE || loadingA;
+  const loading = loadingS || loadingE || loadingA || loadingSettings;
 
   const initialService = initialServiceId ? services.find(s => s.id === initialServiceId) ?? null : null;
   const [step, setStep] = useState(initialService ? 1 : 0);
@@ -53,7 +54,7 @@ export function BookingWizard({ onClose, initialServiceId }: BookingWizardProps)
     ? employees.filter(e => (booking.service!.employees || booking.service!.employeeIds || []).includes(e.id))
     : [];
 
-  const depositAmount = booking.service?.depositAmount ?? 0;
+  // Globalna zaliczka z ustawień (0 = brak zaliczki)
   const requiresDeposit = depositAmount > 0;
 
   const slideVariants = {

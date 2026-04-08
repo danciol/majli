@@ -115,3 +115,29 @@ export function useClients() {
 
   return { clients: data, loading, addClient, updateClient };
 }
+
+// --- Settings ---
+export function useSettings() {
+  const [depositAmount, setDepositAmount] = useState<number>(0);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const unsubscribe = onSnapshot(doc(db, 'settings', 'global'), (snap) => {
+      if (snap.exists()) {
+        setDepositAmount(snap.data().depositAmount ?? 0);
+      } else {
+        setDepositAmount(0);
+      }
+      setLoading(false);
+    }, () => setLoading(false));
+    return unsubscribe;
+  }, []);
+
+  const saveDepositAmount = async (amount: number) => {
+    await import('firebase/firestore').then(({ setDoc }) =>
+      setDoc(doc(db, 'settings', 'global'), { depositAmount: amount }, { merge: true })
+    );
+  };
+
+  return { depositAmount, loading, saveDepositAmount };
+}

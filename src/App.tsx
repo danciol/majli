@@ -14,6 +14,7 @@ import AdminEmployees from "./pages/admin/AdminEmployees";
 import AdminAppointments from "./pages/admin/AdminAppointments";
 import AdminClients from "./pages/admin/AdminClients";
 import AdminMessages from "./pages/admin/AdminMessages";
+import AdminSettings from "./pages/admin/AdminSettings";
 import { AdminLayout } from "./components/admin/AdminLayout";
 
 const queryClient = new QueryClient();
@@ -34,6 +35,7 @@ const App = () => (
               <Route path="wizyty" element={<AdminAppointments />} />
               <Route path="klienci" element={<AdminClients />} />
               <Route path="wiadomosci" element={<AdminMessages />} />
+              <Route path="ustawienia" element={<AdminSettings />} />
               <Route path="uslugi" element={<AdminServices />} />
               <Route path="pracownicy" element={<AdminEmployees />} />
             </Route>
