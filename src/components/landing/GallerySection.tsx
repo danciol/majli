@@ -1,17 +1,42 @@
 import { motion } from 'framer-motion';
+import { useEffect, useState } from 'react';
+import { collection, query, orderBy, onSnapshot } from 'firebase/firestore';
+import { db } from '@/lib/firebase';
+
+interface GalleryImage {
+  id: string;
+  url: string;
+  name: string;
+}
+
+// Placeholder gdy brak zdjęć w Firebase
 import gallery1 from '@/assets/gallery-1.jpg';
 import gallery2 from '@/assets/gallery-2.jpg';
 import gallery3 from '@/assets/gallery-3.jpg';
 import gallery4 from '@/assets/gallery-4.jpg';
 
-const images = [
-  { src: gallery1, alt: 'Profesjonalny manicure' },
-  { src: gallery2, alt: 'Przedłużanie rzęs' },
-  { src: gallery3, alt: 'Lakiery do paznokci' },
-  { src: gallery4, alt: 'Stanowisko stylistki' },
+const placeholders = [
+  { id: 'p1', url: gallery1, name: 'Profesjonalny manicure' },
+  { id: 'p2', url: gallery2, name: 'Przedłużanie rzęs' },
+  { id: 'p3', url: gallery3, name: 'Lakiery do paznokci' },
+  { id: 'p4', url: gallery4, name: 'Stanowisko stylistki' },
 ];
 
 export function GallerySection() {
+  const [images, setImages] = useState<GalleryImage[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const q = query(collection(db, 'gallery'), orderBy('createdAt', 'desc'));
+    const unsub = onSnapshot(q, snap => {
+      setImages(snap.docs.map(d => ({ id: d.id, ...d.data() } as GalleryImage)));
+      setLoading(false);
+    }, () => setLoading(false));
+    return unsub;
+  }, []);
+
+  const displayed = images.length > 0 ? images : placeholders;
+
   return (
     <section id="galeria" className="py-20 md:py-28 bg-secondary/50">
       <div className="container mx-auto px-4">
@@ -26,18 +51,18 @@ export function GallerySection() {
         </motion.div>
 
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 max-w-6xl mx-auto">
-          {images.map((img, i) => (
+          {displayed.map((img, i) => (
             <motion.div
-              key={i}
+              key={img.id}
               initial={{ opacity: 0, scale: 0.95 }}
               whileInView={{ opacity: 1, scale: 1 }}
               viewport={{ once: true }}
-              transition={{ delay: i * 0.1 }}
+              transition={{ delay: i * 0.08 }}
               className="overflow-hidden rounded-xl aspect-square group"
             >
               <img
-                src={img.src}
-                alt={img.alt}
+                src={img.url}
+                alt={img.name}
                 loading="lazy"
                 width={800}
                 height={800}

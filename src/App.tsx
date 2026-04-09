@@ -15,6 +15,7 @@ import AdminAppointments from "./pages/admin/AdminAppointments";
 import AdminClients from "./pages/admin/AdminClients";
 import AdminMessages from "./pages/admin/AdminMessages";
 import AdminSettings from "./pages/admin/AdminSettings";
+import AdminGallery from "./pages/admin/AdminGallery";
 import { AdminLayout } from "./components/admin/AdminLayout";
 
 const queryClient = new QueryClient();
@@ -36,6 +37,7 @@ const App = () => (
               <Route path="klienci" element={<AdminClients />} />
               <Route path="wiadomosci" element={<AdminMessages />} />
               <Route path="ustawienia" element={<AdminSettings />} />
+              <Route path="galeria" element={<AdminGallery />} />
               <Route path="uslugi" element={<AdminServices />} />
               <Route path="pracownicy" element={<AdminEmployees />} />
             </Route>

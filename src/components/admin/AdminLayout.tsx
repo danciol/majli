@@ -1,6 +1,6 @@
 import { Outlet, Link, useLocation, useNavigate, Navigate } from 'react-router-dom';
 import {
-  LayoutDashboard, Calendar, Scissors, Users, ClipboardList, LogOut, Menu, X, UserCheck, MessageSquare, Settings,
+  LayoutDashboard, Calendar, Scissors, Users, ClipboardList, LogOut, Menu, X, UserCheck, MessageSquare, Settings, Images,
 } from 'lucide-react';
 import { useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
@@ -13,6 +13,7 @@ const allLinks = [
   { to: '/admin/klienci', label: 'Klienci', icon: UserCheck, roles: ['admin'] },
   { to: '/admin/wiadomosci', label: 'Wiadomości', icon: MessageSquare, roles: ['admin'] },
   { to: '/admin/ustawienia', label: 'Ustawienia', icon: Settings, roles: ['admin'] },
+  { to: '/admin/galeria', label: 'Galeria', icon: Images, roles: ['admin'] },
   { to: '/admin/uslugi', label: 'Usługi', icon: Scissors, roles: ['admin'] },
   { to: '/admin/pracownicy', label: 'Pracownicy', icon: Users, roles: ['admin'] },
 ];
