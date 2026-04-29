@@ -1,7 +1,7 @@
 import { useState, useMemo } from 'react';
 import { useClients, useAppointments, useServices } from '@/hooks/useFirestore';
 import type { Client } from '@/data/services';
-import { Users, Search, Loader2, Phone, Mail, Calendar, Plus, ChevronDown, ChevronUp, Pencil } from 'lucide-react';
+import { Users, Search, Loader2, Phone, Mail, Calendar, Plus, ChevronDown, ChevronUp, Pencil, Eye, EyeOff } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
@@ -11,6 +11,10 @@ import {
 import { format } from 'date-fns';
 import { pl } from 'date-fns/locale';
 import { toast } from 'sonner';
+import { usePlan } from '@/hooks/usePlan';
+import { useAuth } from '@/contexts/AuthContext';
+import { addDoc, collection } from 'firebase/firestore';
+import { db } from '@/lib/firebase';
 
 type ClientForm = Pick<Client, 'name' | 'phone' | 'email'>;
 
@@ -38,11 +42,29 @@ const AdminClients = () => {
   const { clients, loading: loadingC, addClient, updateClient } = useClients();
   const { appointments, loading: loadingA } = useAppointments();
   const { services, loading: loadingS } = useServices();
+  const { can } = usePlan();
+  const { employee } = useAuth();
   const [search, setSearch] = useState('');
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingClient, setEditingClient] = useState<Client | null>(null);
   const [form, setForm] = useState<ClientForm>(emptyForm);
+  const [revealedPhones, setRevealedPhones] = useState<Set<string>>(new Set());
+
+  const phoneProtection = can('phone_protection');
+  const isAdmin = employee?.role === 'admin';
+
+  const revealPhone = async (clientId: string, clientName: string, phone: string) => {
+    setRevealedPhones(prev => new Set([...prev, clientId]));
+    if (phoneProtection && !isAdmin) {
+      await addDoc(collection(db, 'phone_reveals'), {
+        employeeName: employee?.name || 'Nieznany',
+        clientName,
+        clientPhone: phone,
+        revealedAt: new Date().toISOString(),
+      });
+    }
+  };
 
   const loading = loadingC || loadingA || loadingS;
 
@@ -205,7 +227,19 @@ const AdminClients = () => {
                 <div className="space-y-1.5 text-sm">
                   {client.phone && (
                     <p className="flex items-center gap-2 text-muted-foreground">
-                      <Phone className="w-3.5 h-3.5" /> {client.phone}
+                      <Phone className="w-3.5 h-3.5" />
+                      {phoneProtection && !isAdmin && !revealedPhones.has(client.id)
+                        ? <>
+                            <span className="tracking-widest">••• ••• •••</span>
+                            <button
+                              onClick={() => revealPhone(client.id, client.name, client.phone)}
+                              className="flex items-center gap-1 text-xs text-primary hover:underline ml-1"
+                            >
+                              <Eye className="w-3 h-3" /> Odkryj
+                            </button>
+                          </>
+                        : <span>{client.phone}</span>
+                      }
                     </p>
                   )}
                   {client.email && (
