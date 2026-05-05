@@ -122,6 +122,7 @@ export function useSettings() {
   const [depositAmount, setDepositAmount] = useState<number>(0);
   const [googleClientId, setGoogleClientId] = useState<string>('');
   const [googleConnected, setGoogleConnected] = useState<boolean>(false);
+  const [googleTokenExpiry, setGoogleTokenExpiry] = useState<number>(0);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -130,10 +131,12 @@ export function useSettings() {
         setDepositAmount(snap.data().depositAmount ?? 0);
         setGoogleClientId(snap.data().googleClientId ?? '');
         setGoogleConnected(snap.data().googleConnected ?? false);
+        setGoogleTokenExpiry(snap.data().googleTokenExpiry ?? 0);
       } else {
         setDepositAmount(0);
         setGoogleClientId('');
         setGoogleConnected(false);
+        setGoogleTokenExpiry(0);
       }
       setLoading(false);
     }, () => setLoading(false));
@@ -152,5 +155,5 @@ export function useSettings() {
     );
   };
 
-  return { depositAmount, googleClientId, googleConnected, loading, saveDepositAmount, saveGoogleClientId };
+  return { depositAmount, googleClientId, googleConnected, googleTokenExpiry, loading, saveDepositAmount, saveGoogleClientId };
 }

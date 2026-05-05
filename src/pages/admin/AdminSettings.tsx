@@ -5,11 +5,12 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { toast } from 'sonner';
-import { authorizeSalonAccount, disconnectSalonAccount } from '@/lib/googleCalendar';
+import { authorizeSalonAccount, disconnectSalonAccount, silentRefreshSalonToken } from '@/lib/googleCalendar';
 
 const AdminSettings = () => {
-  const { depositAmount, googleClientId, googleConnected, loading, saveDepositAmount, saveGoogleClientId } = useSettings();
+  const { depositAmount, googleClientId, googleConnected, googleTokenExpiry, loading, saveDepositAmount, saveGoogleClientId } = useSettings();
   const [connectingGoogle, setConnectingGoogle] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
   const [depositValue, setDepositValue] = useState('');
   const [clientIdValue, setClientIdValue] = useState('');
   const [savingDeposit, setSavingDeposit] = useState(false);
@@ -21,6 +22,13 @@ const AdminSettings = () => {
       setClientIdValue(googleClientId || '');
     }
   }, [depositAmount, googleClientId, loading]);
+
+  // Auto silent refresh gdy token wygasł
+  useEffect(() => {
+    if (!googleConnected || !googleClientId) return;
+    if (googleTokenExpiry && googleTokenExpiry > Date.now()) return;
+    silentRefreshSalonToken().catch(() => {});
+  }, [googleConnected, googleClientId, googleTokenExpiry]);
 
   const handleSaveDeposit = async () => {
     const amount = Number(depositValue);
@@ -89,17 +97,39 @@ const AdminSettings = () => {
           <p className="text-sm font-medium">Konto Google salonu</p>
           <p className="text-xs text-muted-foreground">Zaloguj się kontem Google salonu — pracownicy udostępniają mu swoje kalendarze, a wizyty są zapisywane automatycznie.</p>
           {googleConnected ? (
-            <div className="flex items-center justify-between p-3 rounded-lg bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800">
-              <span className="text-sm text-green-700 dark:text-green-400 flex items-center gap-2">
-                <Link2 className="w-4 h-4" /> Konto Google połączone
-              </span>
-              <Button variant="ghost" size="sm" className="text-xs text-muted-foreground hover:text-destructive gap-1"
-                onClick={async () => {
-                  try { await disconnectSalonAccount(); toast.success('Rozłączono konto Google'); }
-                  catch { toast.error('Błąd rozłączania'); }
-                }}>
-                <Unlink className="w-3 h-3" /> Rozłącz
-              </Button>
+            <div className="space-y-2">
+              <div className="flex items-center justify-between p-3 rounded-lg bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800">
+                <span className="text-sm text-green-700 dark:text-green-400 flex items-center gap-2">
+                  <Link2 className="w-4 h-4" />
+                  {googleTokenExpiry && googleTokenExpiry > Date.now()
+                    ? 'Konto Google połączone'
+                    : 'Token wygasł — odnów połączenie'}
+                </span>
+                <Button variant="ghost" size="sm" className="text-xs text-muted-foreground hover:text-destructive gap-1"
+                  onClick={async () => {
+                    try { await disconnectSalonAccount(); toast.success('Rozłączono konto Google'); }
+                    catch { toast.error('Błąd rozłączania'); }
+                  }}>
+                  <Unlink className="w-3 h-3" /> Rozłącz
+                </Button>
+              </div>
+              {googleTokenExpiry && googleTokenExpiry <= Date.now() && (
+                <Button variant="outline" size="sm" className="w-full gap-2" disabled={refreshing}
+                  onClick={async () => {
+                    setRefreshing(true);
+                    try {
+                      const ok = await silentRefreshSalonToken();
+                      if (ok) toast.success('Token odnowiony');
+                      else {
+                        const ok2 = await authorizeSalonAccount();
+                        if (ok2) toast.success('Połączono ponownie');
+                      }
+                    } catch (e: any) { toast.error(e.message || 'Błąd'); }
+                    finally { setRefreshing(false); }
+                  }}>
+                  {refreshing ? <><Loader2 className="w-4 h-4 animate-spin" />Odnawiam...</> : 'Odnów połączenie'}
+                </Button>
+              )}
             </div>
           ) : (
             <Button onClick={async () => {

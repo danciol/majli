@@ -61,6 +61,33 @@ async function getClientId(): Promise<string | null> {
   return snap.exists() ? snap.data().googleClientId || null : null;
 }
 
+export async function silentRefreshSalonToken(): Promise<boolean> {
+  const clientId = await getClientId();
+  if (!clientId) return false;
+  try {
+    await loadGisScript();
+  } catch { return false; }
+
+  return new Promise((resolve) => {
+    const tokenClient = window.google.accounts.oauth2.initTokenClient({
+      client_id: clientId,
+      scope: 'https://www.googleapis.com/auth/calendar',
+      callback: async (response) => {
+        if (response.error || !response.access_token) { resolve(false); return; }
+        const expiresIn = parseInt(response.expires_in || '3600');
+        await setDoc(doc(db, 'settings', 'global'), {
+          googleAccessToken: response.access_token,
+          googleTokenExpiry: Date.now() + expiresIn * 1000,
+          googleConnected: true,
+        }, { merge: true });
+        resolve(true);
+      },
+      error_callback: () => resolve(false),
+    });
+    tokenClient.requestAccessToken({ prompt: '' });
+  });
+}
+
 export async function authorizeSalonAccount(): Promise<boolean> {
   const clientId = await getClientId();
   if (!clientId) throw new Error('Brak Google Client ID w ustawieniach');
