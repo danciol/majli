@@ -119,14 +119,17 @@ export function useClients() {
 // --- Settings ---
 export function useSettings() {
   const [depositAmount, setDepositAmount] = useState<number>(0);
+  const [googleClientId, setGoogleClientId] = useState<string>('');
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const unsubscribe = onSnapshot(doc(db, 'settings', 'global'), (snap) => {
       if (snap.exists()) {
         setDepositAmount(snap.data().depositAmount ?? 0);
+        setGoogleClientId(snap.data().googleClientId ?? '');
       } else {
         setDepositAmount(0);
+        setGoogleClientId('');
       }
       setLoading(false);
     }, () => setLoading(false));
@@ -139,5 +142,11 @@ export function useSettings() {
     );
   };
 
-  return { depositAmount, loading, saveDepositAmount };
+  const saveGoogleClientId = async (clientId: string) => {
+    await import('firebase/firestore').then(({ setDoc }) =>
+      setDoc(doc(db, 'settings', 'global'), { googleClientId: clientId }, { merge: true })
+    );
+  };
+
+  return { depositAmount, googleClientId, loading, saveDepositAmount, saveGoogleClientId };
 }

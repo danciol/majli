@@ -8,6 +8,10 @@ import { seedFirestore } from '@/lib/seedFirestore';
 import { toast } from 'sonner';
 import { Link } from 'react-router-dom';
 import type { Appointment } from '@/data/services';
+import { usePlan } from '@/hooks/usePlan';
+import { createCalendarEvent, deleteCalendarEvent, buildCalendarEvent } from '@/lib/googleCalendar';
+import { doc, updateDoc } from 'firebase/firestore';
+import { db } from '@/lib/firebase';
 
 const statusLabels: Record<string, string> = {
   pending: 'Oczekuje',
@@ -79,16 +83,32 @@ const AdminDashboard = () => {
     window.open(`sms:${appt.clientPhone}?body=${encodeURIComponent(text)}`, '_blank');
   };
 
+  const { can } = usePlan();
+  const hasGoogleCal = can('online_booking');
+
   const handleStatus = async (id: string, status: Appointment['status']) => {
     setUpdatingId(id);
     try {
       await updateAppointment(id, { status });
       toast.success(`Wizyta ${status === 'confirmed' ? 'potwierdzona' : 'anulowana'}`);
-    } catch {
-      toast.error('Błąd zmiany statusu');
-    } finally {
-      setUpdatingId(null);
-    }
+      if (hasGoogleCal) {
+        const appt = appointments.find(a => a.id === id);
+        if (appt) {
+          const service = services.find(s => s.id === appt.serviceId);
+          const employee = employees.find(e => e.id === appt.employeeId);
+          if (employee && (employee as any).googleCalendarConnected) {
+            const event = buildCalendarEvent({ date: appt.date, duration: appt.duration, clientName: appt.clientName, serviceName: service?.name });
+            if (status === 'confirmed' && !appt.googleCalendarEventId) {
+              const eid = await createCalendarEvent(appt.employeeId, event);
+              if (eid) await updateDoc(doc(db, 'appointments', id), { googleCalendarEventId: eid });
+            } else if (status === 'cancelled' && appt.googleCalendarEventId) {
+              await deleteCalendarEvent(appt.employeeId, appt.googleCalendarEventId);
+              await updateDoc(doc(db, 'appointments', id), { googleCalendarEventId: null });
+            }
+          }
+        }
+      }
+    } catch { toast.error('Błąd zmiany statusu'); } finally { setUpdatingId(null); }
   };
 
   if (loading) return <div className="flex items-center justify-center py-20"><Loader2 className="w-6 h-6 animate-spin text-primary" /></div>;

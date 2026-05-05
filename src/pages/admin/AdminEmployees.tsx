@@ -1,7 +1,8 @@
 import { useState } from 'react';
 import type { Employee } from '@/data/services';
 import { useEmployees } from '@/hooks/useFirestore';
-import { Plus, Edit2, Trash2, User, Loader2 } from 'lucide-react';
+import { Plus, Edit2, Trash2, User, Loader2, Calendar, Unlink } from 'lucide-react';
+import { authorizeGoogleCalendar, disconnectGoogleCalendar } from '@/lib/googleCalendar';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -184,6 +185,25 @@ const AdminEmployees = () => {
                 Dni wolne: {emp.daysOff.length}
               </p>
             )}
+
+            <div className="mt-3 pt-3 border-t border-border">
+              {(emp as any).googleCalendarConnected ? (
+                <div className="flex items-center justify-between">
+                  <span className="text-xs text-green-600 flex items-center gap-1.5">
+                    <Calendar className="w-3.5 h-3.5" /> Google Calendar połączony
+                  </span>
+                  <Button variant="ghost" size="sm" className="h-7 text-xs text-muted-foreground hover:text-destructive gap-1"
+                    onClick={async () => { try { await disconnectGoogleCalendar(emp.id); toast.success('Rozłączono'); } catch { toast.error('Błąd'); } }}>
+                    <Unlink className="w-3 h-3" /> Rozłącz
+                  </Button>
+                </div>
+              ) : (
+                <Button variant="outline" size="sm" className="w-full h-8 text-xs gap-1.5"
+                  onClick={async () => { try { const ok = await authorizeGoogleCalendar(emp.id); if (ok) toast.success('Połączono!'); else toast.error('Anulowano'); } catch (e: any) { toast.error(e.message || 'Błąd'); } }}>
+                  <Calendar className="w-3.5 h-3.5" /> Połącz Google Calendar
+                </Button>
+              )}
+            </div>
           </div>
         ))}
       </div>

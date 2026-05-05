@@ -1,12 +1,11 @@
-import { useState, useRef } from 'react';
+import { useState } from 'react';
 import { format, addDays, startOfWeek, isSameDay } from 'date-fns';
 import { pl } from 'date-fns/locale';
-import { ChevronLeft, ChevronRight, Upload, FileUp, CheckCircle2, Plus, Loader2 } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Plus, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Appointment } from '@/data/services';
 import { useAppointments, useServices, useEmployees, useClients } from '@/hooks/useFirestore';
 import { useAuth } from '@/contexts/AuthContext';
-import { parseICSFile } from '@/lib/icsParser';
 import { toast } from 'sonner';
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription,
@@ -46,11 +45,7 @@ const AdminCalendar = () => {
   const { employees, loading: loadingE } = useEmployees();
   const { clients, addClient, updateClient } = useClients();
   const { employee: currentUser } = useAuth();
-  const [showImportDialog, setShowImportDialog] = useState(false);
-  const [pendingImport, setPendingImport] = useState<Partial<Appointment>[]>([]);
   const [selectedEmployeeId, setSelectedEmployeeId] = useState('');
-  const [rawIcsText, setRawIcsText] = useState('');
-  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [apptDialogOpen, setApptDialogOpen] = useState(false);
   const [editingAppointment, setEditingAppointment] = useState<Appointment | null>(null);
@@ -247,12 +242,6 @@ const AdminCalendar = () => {
                 ))}
               </NativeSelect>
             </div>
-          )}
-          <input ref={fileInputRef} type="file" accept=".ics" onChange={handleFileUpload} className="hidden" />
-          {isAdmin && (
-            <Button variant="outline" size="sm" onClick={() => fileInputRef.current?.click()} className="gap-2">
-              <Upload className="w-4 h-4" /> Importuj .ics
-            </Button>
           )}
           <div className="flex items-center gap-1 ml-2">
             <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setCurrentDate(d => addDays(d, -7))}>

@@ -8,6 +8,10 @@ import { NativeSelect } from '@/components/ui/native-select';
 import type { Appointment } from '@/data/services';
 import { CheckCircle, X, Loader2, Search, MessageSquare } from 'lucide-react';
 import { toast } from 'sonner';
+import { usePlan } from '@/hooks/usePlan';
+import { createCalendarEvent, updateCalendarEvent, deleteCalendarEvent, buildCalendarEvent } from '@/lib/googleCalendar';
+import { doc, updateDoc } from 'firebase/firestore';
+import { db } from '@/lib/firebase';
 
 const statusLabels: Record<Appointment['status'], string> = {
   pending: 'Oczekuje',
@@ -74,16 +78,32 @@ const AdminAppointments = () => {
     setServiceFilter('all');
   };
 
+  const { can } = usePlan();
+  const hasGoogleCal = can('online_booking');
+
   const handleStatusChange = async (id: string, status: Appointment['status']) => {
     setUpdatingId(id);
     try {
       await updateAppointment(id, { status });
       toast.success(`Status zmieniony na: ${statusLabels[status].toLowerCase()}`);
-    } catch {
-      toast.error('Błąd zmiany statusu');
-    } finally {
-      setUpdatingId(null);
-    }
+      if (hasGoogleCal) {
+        const appt = appointments.find(a => a.id === id);
+        if (appt) {
+          const service = serviceMap.get(appt.serviceId);
+          const employee = employees.find(e => e.id === appt.employeeId);
+          if (employee && (employee as any).googleCalendarConnected) {
+            const event = buildCalendarEvent({ date: appt.date, duration: appt.duration, clientName: appt.clientName, serviceName: service?.name });
+            if (status === 'confirmed') {
+              if (appt.googleCalendarEventId) { await updateCalendarEvent(appt.employeeId, appt.googleCalendarEventId, event); }
+              else { const eid = await createCalendarEvent(appt.employeeId, event); if (eid) await updateDoc(doc(db, 'appointments', id), { googleCalendarEventId: eid }); }
+            } else if (status === 'cancelled' && appt.googleCalendarEventId) {
+              await deleteCalendarEvent(appt.employeeId, appt.googleCalendarEventId);
+              await updateDoc(doc(db, 'appointments', id), { googleCalendarEventId: null });
+            }
+          }
+        }
+      }
+    } catch { toast.error('Błąd zmiany statusu'); } finally { setUpdatingId(null); }
   };
 
   if (loading) return <div className="flex items-center justify-center py-20"><Loader2 className="w-6 h-6 animate-spin text-primary" /></div>;
@@ -168,6 +188,9 @@ const AdminAppointments = () => {
                     <td className="p-3">
                       <p className="font-medium">{appt.clientName}</p>
                       <p className="text-xs text-muted-foreground">{appt.clientPhone}</p>
+                      {(appt as any).importSource === 'google_calendar' && (
+                        <span className="inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded-full bg-blue-50 text-blue-600 border border-blue-100 font-medium mt-0.5">📅 Google Cal</span>
+                      )}
                     </td>
                     <td className="p-3">
                       <p>{service?.name}</p>
