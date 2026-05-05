@@ -84,8 +84,9 @@ export function useEmployees() {
 export function useAppointments() {
   const { data, loading } = useCollection<Appointment>('appointments');
 
-  const addAppointment = async (appointment: Omit<Appointment, 'id'>) => {
-    await addDoc(collection(db, 'appointments'), appointment);
+  const addAppointment = async (appointment: Omit<Appointment, 'id'>): Promise<string> => {
+    const ref = await addDoc(collection(db, 'appointments'), appointment);
+    return ref.id;
   };
 
   const updateAppointment = async (id: string, updates: Partial<Appointment>) => {

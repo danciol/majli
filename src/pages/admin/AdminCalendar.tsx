@@ -9,6 +9,9 @@ import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
 import AppointmentDialog, { formatPhoneNumber } from '@/components/admin/AppointmentDialog';
 import { NativeSelect } from '@/components/ui/native-select';
+import { createCalendarEvent, updateCalendarEvent, deleteCalendarEvent, buildCalendarEvent } from '@/lib/googleCalendar';
+import { doc, updateDoc } from 'firebase/firestore';
+import { db } from '@/lib/firebase';
 
 const HOUR_HEIGHT = 56; // px per hour row
 const hours = Array.from({ length: 13 }, (_, i) => i + 8);
@@ -105,22 +108,49 @@ const AdminCalendar = () => {
 
   const handleSaveAppointment = async (data: Appointment) => {
     try {
+      const employee = employees.find(e => e.id === data.employeeId);
+      const service = services.find(s => s.id === data.serviceId);
+      const calEvent = buildCalendarEvent({
+        date: data.date,
+        duration: data.duration,
+        clientName: data.clientName,
+        clientPhone: data.clientPhone,
+        serviceName: service?.name,
+        notes: data.notes,
+      });
+
       if (editingAppointment) {
         const { id, ...rest } = data;
         await updateAppointment(id, rest);
         toast.success('Wizyta zaktualizowana');
+        if ((employee as any)?.googleCalendarConnected) {
+          if (data.googleCalendarEventId) {
+            await updateCalendarEvent(data.employeeId, data.googleCalendarEventId, calEvent);
+          } else {
+            const eid = await createCalendarEvent(data.employeeId, calEvent);
+            if (eid) await updateDoc(doc(db, 'appointments', id), { googleCalendarEventId: eid });
+          }
+        }
       } else {
-        const { id, ...rest } = data;
-        await addAppointment(rest);
+        const { id: _id, ...rest } = data;
+        const newId = await addAppointment(rest);
         toast.success('Wizyta dodana');
+        if ((employee as any)?.googleCalendarConnected) {
+          const eid = await createCalendarEvent(data.employeeId, calEvent);
+          if (eid) await updateDoc(doc(db, 'appointments', newId), { googleCalendarEventId: eid });
+        }
       }
-      // Auto-save client
+
       await upsertClient(data.clientName, data.clientPhone, data.clientEmail);
     } catch { toast.error('Błąd zapisu'); }
   };
 
   const handleDeleteAppointment = async (id: string) => {
     try {
+      const appt = appointments.find(a => a.id === id);
+      if (appt?.googleCalendarEventId) {
+        await deleteCalendarEvent(appt.employeeId, appt.googleCalendarEventId);
+      }
       await deleteAppointment(id);
       toast.success('Wizyta usunięta');
     } catch { toast.error('Błąd usuwania'); }
