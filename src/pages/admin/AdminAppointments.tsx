@@ -8,10 +8,6 @@ import { NativeSelect } from '@/components/ui/native-select';
 import type { Appointment } from '@/data/services';
 import { CheckCircle, X, Loader2, Search, MessageSquare } from 'lucide-react';
 import { toast } from 'sonner';
-import { usePlan } from '@/hooks/usePlan';
-import { createCalendarEvent, updateCalendarEvent, deleteCalendarEvent, buildCalendarEvent } from '@/lib/googleCalendar';
-import { doc, updateDoc } from 'firebase/firestore';
-import { db } from '@/lib/firebase';
 
 const statusLabels: Record<Appointment['status'], string> = {
   pending: 'Oczekuje',
@@ -78,32 +74,11 @@ const AdminAppointments = () => {
     setServiceFilter('all');
   };
 
-  const { can } = usePlan();
-  const hasGoogleCal = can('online_booking');
-
   const handleStatusChange = async (id: string, status: Appointment['status']) => {
     setUpdatingId(id);
     try {
       await updateAppointment(id, { status });
       toast.success(`Status zmieniony na: ${statusLabels[status].toLowerCase()}`);
-      if (hasGoogleCal) {
-        const appt = appointments.find(a => a.id === id);
-        if (appt) {
-          const service = serviceMap.get(appt.serviceId);
-          const employee = employees.find(e => e.id === appt.employeeId);
-          const calId = (employee as any)?.googleCalendarId;
-          if (employee && calId) {
-            const event = buildCalendarEvent({ date: appt.date, duration: appt.duration, clientName: appt.clientName, serviceName: service?.name });
-            if (status === 'confirmed') {
-              if (appt.googleCalendarEventId) { await updateCalendarEvent(calId, appt.googleCalendarEventId, event); }
-              else { const eid = await createCalendarEvent(calId, event); if (eid) await updateDoc(doc(db, 'appointments', id), { googleCalendarEventId: eid }); }
-            } else if (status === 'cancelled' && appt.googleCalendarEventId) {
-              await deleteCalendarEvent(calId, appt.googleCalendarEventId);
-              await updateDoc(doc(db, 'appointments', id), { googleCalendarEventId: null });
-            }
-          }
-        }
-      }
     } catch { toast.error('Błąd zmiany statusu'); } finally { setUpdatingId(null); }
   };
 

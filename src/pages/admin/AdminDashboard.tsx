@@ -11,10 +11,6 @@ import { seedFirestore } from '@/lib/seedFirestore';
 import { toast } from 'sonner';
 import { Link } from 'react-router-dom';
 import type { Appointment } from '@/data/services';
-import { usePlan } from '@/hooks/usePlan';
-import { createCalendarEvent, deleteCalendarEvent, buildCalendarEvent } from '@/lib/googleCalendar';
-import { doc, updateDoc } from 'firebase/firestore';
-import { db } from '@/lib/firebase';
 import { sendSms, isTextBeeConfigured } from '@/lib/textbee';
 
 const statusLabels: Record<string, string> = {
@@ -128,32 +124,11 @@ const AdminDashboard = () => {
     }
   };
 
-  const { can } = usePlan();
-  const hasGoogleCal = can('online_booking');
-
   const handleStatus = async (id: string, status: Appointment['status']) => {
     setUpdatingId(id);
     try {
       await updateAppointment(id, { status });
       toast.success(`Wizyta ${status === 'confirmed' ? 'potwierdzona' : 'anulowana'}`);
-      if (hasGoogleCal) {
-        const appt = appointments.find(a => a.id === id);
-        if (appt) {
-          const service = services.find(s => s.id === appt.serviceId);
-          const employee = employees.find(e => e.id === appt.employeeId);
-          const calId = (employee as any)?.googleCalendarId;
-          if (employee && calId) {
-            const event = buildCalendarEvent({ date: appt.date, duration: appt.duration, clientName: appt.clientName, serviceName: service?.name });
-            if (status === 'confirmed' && !appt.googleCalendarEventId) {
-              const eid = await createCalendarEvent(calId, event);
-              if (eid) await updateDoc(doc(db, 'appointments', id), { googleCalendarEventId: eid });
-            } else if (status === 'cancelled' && appt.googleCalendarEventId) {
-              await deleteCalendarEvent(calId, appt.googleCalendarEventId);
-              await updateDoc(doc(db, 'appointments', id), { googleCalendarEventId: null });
-            }
-          }
-        }
-      }
     } catch { toast.error('Błąd zmiany statusu'); } finally { setUpdatingId(null); }
   };
 

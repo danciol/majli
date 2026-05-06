@@ -35,7 +35,6 @@ export interface Appointment {
   date: string;
   duration: number;
   status: 'pending' | 'confirmed' | 'cancelled' | 'completed';
-  googleCalendarEventId?: string;
   notes?: string;
   createdAt: string;
   depositAmount?: number;         // wymagana zaliczka w zł

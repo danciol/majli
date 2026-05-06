@@ -90,7 +90,6 @@ const AppointmentDialog = ({
       createdAt: appointment?.createdAt || new Date().toISOString(),
     };
     if (notes) data.notes = notes;
-    if (appointment?.googleCalendarEventId) data.googleCalendarEventId = appointment.googleCalendarEventId;
 
     onSave(data);
     onOpenChange(false);
