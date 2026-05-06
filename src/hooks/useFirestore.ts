@@ -122,6 +122,7 @@ export function useSettings() {
   const [depositAmount, setDepositAmount] = useState<number>(0);
   const [textBeeApiKey, setTextBeeApiKey] = useState<string>('');
   const [textBeeDeviceId, setTextBeeDeviceId] = useState<string>('');
+  const [reminderTemplate, setReminderTemplate] = useState<string>('');
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -130,10 +131,12 @@ export function useSettings() {
         setDepositAmount(snap.data().depositAmount ?? 0);
         setTextBeeApiKey(snap.data().textBeeApiKey ?? '');
         setTextBeeDeviceId(snap.data().textBeeDeviceId ?? '');
+        setReminderTemplate(snap.data().reminderTemplate ?? '');
       } else {
         setDepositAmount(0);
         setTextBeeApiKey('');
         setTextBeeDeviceId('');
+        setReminderTemplate('');
       }
       setLoading(false);
     }, () => setLoading(false));
@@ -152,5 +155,11 @@ export function useSettings() {
     );
   };
 
-  return { depositAmount, textBeeApiKey, textBeeDeviceId, loading, saveDepositAmount, saveTextBee };
+  const saveReminderTemplate = async (template: string) => {
+    await import('firebase/firestore').then(({ setDoc }) =>
+      setDoc(doc(db, 'settings', 'global'), { reminderTemplate: template }, { merge: true })
+    );
+  };
+
+  return { depositAmount, textBeeApiKey, textBeeDeviceId, reminderTemplate, loading, saveDepositAmount, saveTextBee, saveReminderTemplate };
 }

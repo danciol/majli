@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
-import { Calendar, Clock, TrendingUp, Loader2, Database, AlertCircle, CheckCircle, X, MessageSquare, Send } from 'lucide-react';
-import { useAppointments, useServices, useEmployees } from '@/hooks/useFirestore';
+import { Calendar, Clock, TrendingUp, Loader2, Database, AlertCircle, CheckCircle, X, MessageSquare, Send, Save } from 'lucide-react';
+import { useAppointments, useServices, useEmployees, useSettings } from '@/hooks/useFirestore';
 import { format, addDays } from 'date-fns';
 import { pl } from 'date-fns/locale';
 import { Button } from '@/components/ui/button';
@@ -34,10 +34,13 @@ const depositLabels: Record<string, string> = {
   refunded: '↩️ Zwrócona',
 };
 
+const DEFAULT_TEMPLATE = 'Przypomnienie: wizyta w salonie Majli Beauty {data} o godz. {godzina} ({zabieg}, {pracownik}). Do zobaczenia!';
+
 const AdminDashboard = () => {
   const { appointments, loading: loadingA, updateAppointment } = useAppointments();
   const { services, loading: loadingS } = useServices();
   const { employees, loading: loadingE } = useEmployees();
+  const { reminderTemplate, saveReminderTemplate } = useSettings();
   const [seeding, setSeeding] = useState(false);
   const [updatingId, setUpdatingId] = useState<string | null>(null);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
@@ -45,6 +48,10 @@ const AdminDashboard = () => {
   const [smsDialog, setSmsDialog] = useState<{ open: boolean; appts: Appointment[]; message: string }>({
     open: false, appts: [], message: '',
   });
+  const [templateDraft, setTemplateDraft] = useState<string | null>(null);
+  const [savingTemplate, setSavingTemplate] = useState(false);
+
+  const currentTemplate = templateDraft ?? (reminderTemplate || DEFAULT_TEMPLATE);
 
   const loading = loadingA || loadingS || loadingE;
   const today = new Date();
@@ -80,10 +87,16 @@ const AdminDashboard = () => {
     { label: 'Wszystkie wizyty', value: appointments.length, icon: TrendingUp, color: 'text-green-600' },
   ];
 
-  const buildReminderText = (appt: Appointment) => {
+  const buildReminderText = (appt: Appointment, template?: string) => {
     const service = services.find(s => s.id === appt.serviceId);
-    const date = format(new Date(appt.date), "d MMMM 'o godz.' HH:mm", { locale: pl });
-    return `Przypomnienie: wizyta w salonie Majli Beauty ${date} (${service?.name || 'wizyta'}). Do zobaczenia!`;
+    const employee = employees.find(e => e.id === appt.employeeId);
+    const d = new Date(appt.date);
+    return (template ?? currentTemplate)
+      .replace(/\{imie\}/g, appt.clientName)
+      .replace(/\{data\}/g, format(d, 'd MMMM', { locale: pl }))
+      .replace(/\{godzina\}/g, format(d, 'HH:mm'))
+      .replace(/\{zabieg\}/g, service?.name || 'wizyta')
+      .replace(/\{pracownik\}/g, employee?.name || '');
   };
 
   const openSmsDialog = (appts: Appointment[]) => {
@@ -248,6 +261,56 @@ const AdminDashboard = () => {
           </div>
         </div>
       )}
+
+      {/* Szablon przypomnienia SMS */}
+      <div className="glass-card p-5 space-y-3">
+        <div className="flex items-center justify-between">
+          <h2 className="font-semibold text-sm flex items-center gap-2">
+            <MessageSquare className="w-4 h-4 text-blue-500" />
+            Szablon przypomnienia SMS
+          </h2>
+          <div className="flex gap-2 items-center">
+            <span className="text-[11px] text-muted-foreground hidden sm:block">
+              {['{imie}', '{data}', '{godzina}', '{zabieg}', '{pracownik}'].map(v => (
+                <span key={v} className="mr-1.5 font-mono bg-secondary px-1 py-0.5 rounded">{v}</span>
+              ))}
+            </span>
+            <Button
+              size="sm"
+              variant="outline"
+              className="h-7 text-xs gap-1.5"
+              disabled={savingTemplate || templateDraft === null}
+              onClick={async () => {
+                setSavingTemplate(true);
+                try {
+                  await saveReminderTemplate(currentTemplate);
+                  setTemplateDraft(null);
+                  toast.success('Szablon zapisany');
+                } catch { toast.error('Błąd zapisu'); }
+                finally { setSavingTemplate(false); }
+              }}
+            >
+              {savingTemplate ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
+              Zapisz
+            </Button>
+          </div>
+        </div>
+        <Textarea
+          value={currentTemplate}
+          onChange={e => setTemplateDraft(e.target.value)}
+          rows={2}
+          className="resize-none text-sm"
+          placeholder={DEFAULT_TEMPLATE}
+        />
+        <p className="text-xs text-muted-foreground">
+          Podgląd: <span className="text-foreground italic">
+            {tomorrowAppointments[0]
+              ? buildReminderText(tomorrowAppointments[0], currentTemplate)
+              : buildReminderText({ clientName: 'Anna K.', date: new Date().toISOString(), serviceId: services[0]?.id || '', employeeId: employees[0]?.id || '', duration: 60, status: 'confirmed', clientPhone: '', clientEmail: '', createdAt: '' } as Appointment, currentTemplate)
+            }
+          </span>
+        </p>
+      </div>
 
       {/* Jutrzejsze wizyty */}
       <div className="glass-card p-6">
