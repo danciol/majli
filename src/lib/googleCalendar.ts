@@ -48,7 +48,72 @@ function loadGisScript(): Promise<void> {
   });
 }
 
+// --- Service Account JWT flow ---
+
+let _saTokenCache: { token: string; expiresAt: number } | null = null;
+
+async function getServiceAccount(): Promise<Record<string, string> | null> {
+  const snap = await getDoc(doc(db, 'settings', 'global'));
+  if (!snap.exists()) return null;
+  const raw = snap.data().serviceAccountKey;
+  if (!raw) return null;
+  try { return typeof raw === 'string' ? JSON.parse(raw) : raw; }
+  catch { return null; }
+}
+
+function pemToArrayBuffer(pem: string): ArrayBuffer {
+  const b64 = pem.replace(/-----[^-]+-----/g, '').replace(/\s/g, '');
+  const binary = atob(b64);
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+  return bytes.buffer;
+}
+
+function toBase64url(buffer: ArrayBuffer | Uint8Array): string {
+  const bytes = buffer instanceof ArrayBuffer ? new Uint8Array(buffer) : buffer;
+  let str = '';
+  bytes.forEach(b => (str += String.fromCharCode(b)));
+  return btoa(str).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+}
+
+async function getServiceAccountToken(): Promise<string | null> {
+  if (_saTokenCache && _saTokenCache.expiresAt > Date.now() + 60_000) return _saTokenCache.token;
+  const sa = await getServiceAccount();
+  if (!sa?.private_key || !sa?.client_email) return null;
+  try {
+    const enc = new TextEncoder();
+    const now = Math.floor(Date.now() / 1000);
+    const headerB64 = toBase64url(enc.encode(JSON.stringify({ alg: 'RS256', typ: 'JWT' })));
+    const payloadB64 = toBase64url(enc.encode(JSON.stringify({
+      iss: sa.client_email, scope: 'https://www.googleapis.com/auth/calendar',
+      aud: 'https://oauth2.googleapis.com/token', iat: now, exp: now + 3600,
+    })));
+    const signingInput = `${headerB64}.${payloadB64}`;
+    const key = await crypto.subtle.importKey(
+      'pkcs8', pemToArrayBuffer(sa.private_key),
+      { name: 'RSASSA-PKCS1-v1_5', hash: 'SHA-256' }, false, ['sign']
+    );
+    const sig = await crypto.subtle.sign('RSASSA-PKCS1-v1_5', key, enc.encode(signingInput));
+    const jwt = `${signingInput}.${toBase64url(sig)}`;
+    const res = await fetch('https://oauth2.googleapis.com/token', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams({ grant_type: 'urn:ietf:params:oauth2:grant-type:jwt-bearer', assertion: jwt }),
+    });
+    if (!res.ok) return null;
+    const { access_token, expires_in } = await res.json();
+    if (!access_token) return null;
+    _saTokenCache = { token: access_token, expiresAt: Date.now() + (expires_in ?? 3600) * 1000 };
+    return access_token;
+  } catch { return null; }
+}
+
+// ---
+
 async function getSalonToken(): Promise<string | null> {
+  const saToken = await getServiceAccountToken();
+  if (saToken) return saToken;
+  // fallback: stored OAuth token
   const snap = await getDoc(doc(db, 'settings', 'global'));
   if (!snap.exists()) return null;
   const data = snap.data();

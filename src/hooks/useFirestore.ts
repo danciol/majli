@@ -123,6 +123,9 @@ export function useSettings() {
   const [googleClientId, setGoogleClientId] = useState<string>('');
   const [googleConnected, setGoogleConnected] = useState<boolean>(false);
   const [googleTokenExpiry, setGoogleTokenExpiry] = useState<number>(0);
+  const [textBeeApiKey, setTextBeeApiKey] = useState<string>('');
+  const [textBeeDeviceId, setTextBeeDeviceId] = useState<string>('');
+  const [serviceAccountEmail, setServiceAccountEmail] = useState<string>('');
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -132,11 +135,21 @@ export function useSettings() {
         setGoogleClientId(snap.data().googleClientId ?? '');
         setGoogleConnected(snap.data().googleConnected ?? false);
         setGoogleTokenExpiry(snap.data().googleTokenExpiry ?? 0);
+        setTextBeeApiKey(snap.data().textBeeApiKey ?? '');
+        setTextBeeDeviceId(snap.data().textBeeDeviceId ?? '');
+        try {
+          const saRaw = snap.data().serviceAccountKey;
+          const sa = saRaw ? (typeof saRaw === 'string' ? JSON.parse(saRaw) : saRaw) : null;
+          setServiceAccountEmail(sa?.client_email ?? '');
+        } catch { setServiceAccountEmail(''); }
       } else {
         setDepositAmount(0);
         setGoogleClientId('');
         setGoogleConnected(false);
         setGoogleTokenExpiry(0);
+        setTextBeeApiKey('');
+        setTextBeeDeviceId('');
+        setServiceAccountEmail('');
       }
       setLoading(false);
     }, () => setLoading(false));
@@ -155,5 +168,17 @@ export function useSettings() {
     );
   };
 
-  return { depositAmount, googleClientId, googleConnected, googleTokenExpiry, loading, saveDepositAmount, saveGoogleClientId };
+  const saveTextBee = async (apiKey: string, deviceId: string) => {
+    await import('firebase/firestore').then(({ setDoc }) =>
+      setDoc(doc(db, 'settings', 'global'), { textBeeApiKey: apiKey, textBeeDeviceId: deviceId }, { merge: true })
+    );
+  };
+
+  const saveServiceAccount = async (json: string) => {
+    await import('firebase/firestore').then(({ setDoc }) =>
+      setDoc(doc(db, 'settings', 'global'), { serviceAccountKey: json }, { merge: true })
+    );
+  };
+
+  return { depositAmount, googleClientId, googleConnected, googleTokenExpiry, textBeeApiKey, textBeeDeviceId, serviceAccountEmail, loading, saveDepositAmount, saveGoogleClientId, saveTextBee, saveServiceAccount };
 }
