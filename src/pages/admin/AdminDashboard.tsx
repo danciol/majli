@@ -5,6 +5,8 @@ import { format, addDays } from 'date-fns';
 import { pl } from 'date-fns/locale';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
+import { Textarea } from '@/components/ui/textarea';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { seedFirestore } from '@/lib/seedFirestore';
 import { toast } from 'sonner';
 import { Link } from 'react-router-dom';
@@ -44,6 +46,9 @@ const AdminDashboard = () => {
   const [updatingId, setUpdatingId] = useState<string | null>(null);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [sendingReminders, setSendingReminders] = useState(false);
+  const [smsDialog, setSmsDialog] = useState<{ open: boolean; appts: Appointment[]; message: string }>({
+    open: false, appts: [], message: '',
+  });
 
   const loading = loadingA || loadingS || loadingE;
   const today = new Date();
@@ -85,34 +90,40 @@ const AdminDashboard = () => {
     return `Przypomnienie: wizyta w salonie Majli Beauty ${date} (${service?.name || 'wizyta'}). Do zobaczenia!`;
   };
 
-  const sendReminders = async (appts: Appointment[]) => {
+  const openSmsDialog = (appts: Appointment[]) => {
     const withPhone = appts.filter(a => a.clientPhone);
     if (withPhone.length === 0) { toast.error('Brak numerów telefonów'); return; }
+    const first = withPhone[0];
+    setSmsDialog({ open: true, appts: withPhone, message: buildReminderText(first) });
+  };
+
+  const confirmSendReminders = async () => {
+    const { appts, message } = smsDialog;
+    if (!message.trim()) { toast.error('Treść wiadomości jest pusta'); return; }
     setSendingReminders(true);
     try {
       const configured = await isTextBeeConfigured();
       if (!configured) {
-        // fallback: open sms: links
-        withPhone.forEach(appt => {
-          const text = buildReminderText(appt);
-          window.open(`sms:${appt.clientPhone}?body=${encodeURIComponent(text)}`, '_blank');
+        appts.forEach(appt => {
+          window.open(`sms:${appt.clientPhone}?body=${encodeURIComponent(message)}`, '_blank');
         });
-        toast.success(`Otwarto SMS dla ${withPhone.length} klientek`);
-        return;
+        toast.success(`Otwarto SMS dla ${appts.length} klientek`);
+      } else {
+        let sent = 0;
+        let failed = 0;
+        for (const appt of appts) {
+          const result = await sendSms([appt.clientPhone!], message);
+          sent += result.sent;
+          failed += result.failed;
+        }
+        if (failed === 0) toast.success(`Wysłano ${sent} SMS-ów`);
+        else toast.warning(`Wysłano ${sent}, błąd: ${failed}`);
       }
-      let sent = 0;
-      let failed = 0;
-      for (const appt of withPhone) {
-        const result = await sendSms([appt.clientPhone!], buildReminderText(appt));
-        sent += result.sent;
-        failed += result.failed;
-      }
-      if (failed === 0) toast.success(`Wysłano ${sent} SMS-ów`);
-      else toast.warning(`Wysłano ${sent}, błąd: ${failed}`);
     } catch (e: any) {
       toast.error(e.message || 'Błąd wysyłania SMS');
     } finally {
       setSendingReminders(false);
+      setSmsDialog(prev => ({ ...prev, open: false }));
       setSelectedIds(new Set());
     }
   };
@@ -279,7 +290,7 @@ const AdminDashboard = () => {
                 <Button
                   size="sm"
                   disabled={sendingReminders}
-                  onClick={() => sendReminders(tomorrowAppointments.filter(a => selectedIds.has(a.id)))}
+                  onClick={() => openSmsDialog(tomorrowAppointments.filter(a => selectedIds.has(a.id)))}
                   className="gap-1.5 h-8 text-xs"
                 >
                   {sendingReminders
@@ -344,7 +355,7 @@ const AdminDashboard = () => {
                       variant="ghost" size="icon" className="h-8 w-8 text-blue-500 hover:text-blue-600 hover:bg-blue-50"
                       title="Wyślij SMS przypomnienie"
                       disabled={!appt.clientPhone || sendingReminders}
-                      onClick={e => { e.stopPropagation(); sendReminders([appt]); }}
+                      onClick={e => { e.stopPropagation(); openSmsDialog([appt]); }}
                     >
                       {sendingReminders ? <Loader2 className="w-4 h-4 animate-spin" /> : <MessageSquare className="w-4 h-4" />}
                     </Button>
@@ -355,6 +366,45 @@ const AdminDashboard = () => {
           </div>
         )}
       </div>
+
+      {/* Dialog: edycja treści SMS */}
+      <Dialog open={smsDialog.open} onOpenChange={open => setSmsDialog(prev => ({ ...prev, open }))}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <MessageSquare className="w-5 h-5 text-blue-500" />
+              Wyślij przypomnienie SMS
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3 py-2">
+            <p className="text-sm text-muted-foreground">
+              Odbiorcy ({smsDialog.appts.length}):&nbsp;
+              <span className="text-foreground font-medium">
+                {smsDialog.appts.map(a => a.clientName).join(', ')}
+              </span>
+            </p>
+            <Textarea
+              value={smsDialog.message}
+              onChange={e => setSmsDialog(prev => ({ ...prev, message: e.target.value }))}
+              rows={4}
+              className="resize-none text-sm"
+              placeholder="Treść wiadomości..."
+            />
+            <p className="text-xs text-muted-foreground text-right">{smsDialog.message.length} znaków</p>
+          </div>
+          <DialogFooter className="gap-2">
+            <Button variant="outline" onClick={() => setSmsDialog(prev => ({ ...prev, open: false }))}>
+              Anuluj
+            </Button>
+            <Button onClick={confirmSendReminders} disabled={sendingReminders} className="gap-2">
+              {sendingReminders
+                ? <><Loader2 className="w-4 h-4 animate-spin" />Wysyłam...</>
+                : <><Send className="w-4 h-4" />Wyślij do {smsDialog.appts.length}</>
+              }
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Dzisiejsze wizyty */}
       <div className="glass-card p-6">
