@@ -1,9 +1,10 @@
 import { useMemo, useState } from 'react';
-import { Calendar, Users, Clock, TrendingUp, Loader2, Database, AlertCircle, CheckCircle, X, MessageSquare } from 'lucide-react';
+import { Calendar, Clock, TrendingUp, Loader2, Database, AlertCircle, CheckCircle, X, MessageSquare, Send } from 'lucide-react';
 import { useAppointments, useServices, useEmployees } from '@/hooks/useFirestore';
 import { format, addDays } from 'date-fns';
 import { pl } from 'date-fns/locale';
 import { Button } from '@/components/ui/button';
+import { Checkbox } from '@/components/ui/checkbox';
 import { seedFirestore } from '@/lib/seedFirestore';
 import { toast } from 'sonner';
 import { Link } from 'react-router-dom';
@@ -12,6 +13,7 @@ import { usePlan } from '@/hooks/usePlan';
 import { createCalendarEvent, deleteCalendarEvent, buildCalendarEvent } from '@/lib/googleCalendar';
 import { doc, updateDoc } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
+import { sendSms, isTextBeeConfigured } from '@/lib/textbee';
 
 const statusLabels: Record<string, string> = {
   pending: 'Oczekuje',
@@ -40,6 +42,8 @@ const AdminDashboard = () => {
   const { employees, loading: loadingE } = useEmployees();
   const [seeding, setSeeding] = useState(false);
   const [updatingId, setUpdatingId] = useState<string | null>(null);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [sendingReminders, setSendingReminders] = useState(false);
 
   const loading = loadingA || loadingS || loadingE;
   const today = new Date();
@@ -75,12 +79,42 @@ const AdminDashboard = () => {
     { label: 'Wszystkie wizyty', value: appointments.length, icon: TrendingUp, color: 'text-green-600' },
   ];
 
-  const sendSmsReminder = (appt: Appointment) => {
-    if (!appt.clientPhone) { toast.error('Brak numeru telefonu'); return; }
+  const buildReminderText = (appt: Appointment) => {
     const service = services.find(s => s.id === appt.serviceId);
     const date = format(new Date(appt.date), "d MMMM 'o godz.' HH:mm", { locale: pl });
-    const text = `Przypomnienie: wizyta w salonie Majli Beauty ${date} (${service?.name || 'wizyta'}). Do zobaczenia! 💅`;
-    window.open(`sms:${appt.clientPhone}?body=${encodeURIComponent(text)}`, '_blank');
+    return `Przypomnienie: wizyta w salonie Majli Beauty ${date} (${service?.name || 'wizyta'}). Do zobaczenia!`;
+  };
+
+  const sendReminders = async (appts: Appointment[]) => {
+    const withPhone = appts.filter(a => a.clientPhone);
+    if (withPhone.length === 0) { toast.error('Brak numerów telefonów'); return; }
+    setSendingReminders(true);
+    try {
+      const configured = await isTextBeeConfigured();
+      if (!configured) {
+        // fallback: open sms: links
+        withPhone.forEach(appt => {
+          const text = buildReminderText(appt);
+          window.open(`sms:${appt.clientPhone}?body=${encodeURIComponent(text)}`, '_blank');
+        });
+        toast.success(`Otwarto SMS dla ${withPhone.length} klientek`);
+        return;
+      }
+      let sent = 0;
+      let failed = 0;
+      for (const appt of withPhone) {
+        const result = await sendSms([appt.clientPhone!], buildReminderText(appt));
+        sent += result.sent;
+        failed += result.failed;
+      }
+      if (failed === 0) toast.success(`Wysłano ${sent} SMS-ów`);
+      else toast.warning(`Wysłano ${sent}, błąd: ${failed}`);
+    } catch (e: any) {
+      toast.error(e.message || 'Błąd wysyłania SMS');
+    } finally {
+      setSendingReminders(false);
+      setSelectedIds(new Set());
+    }
   };
 
   const { can } = usePlan();
@@ -240,18 +274,31 @@ const AdminDashboard = () => {
             </span>
           </h2>
           {tomorrowAppointments.length > 0 && (
-            <button
-              onClick={() => {
-                tomorrowAppointments.forEach(appt => {
-                  if (appt.clientPhone) sendSmsReminder(appt);
-                });
-                toast.success(`Otwarto SMS dla ${tomorrowAppointments.filter(a => a.clientPhone).length} klientek`);
-              }}
-              className="flex items-center gap-1.5 text-xs font-medium text-blue-500 hover:text-blue-600 hover:underline"
-            >
-              <MessageSquare className="w-3.5 h-3.5" />
-              Wyślij przypomnienia do wszystkich
-            </button>
+            <div className="flex items-center gap-3">
+              {selectedIds.size > 0 && (
+                <Button
+                  size="sm"
+                  disabled={sendingReminders}
+                  onClick={() => sendReminders(tomorrowAppointments.filter(a => selectedIds.has(a.id)))}
+                  className="gap-1.5 h-8 text-xs"
+                >
+                  {sendingReminders
+                    ? <><Loader2 className="w-3.5 h-3.5 animate-spin" />Wysyłam...</>
+                    : <><Send className="w-3.5 h-3.5" />Wyślij ({selectedIds.size})</>
+                  }
+                </Button>
+              )}
+              <button
+                onClick={() => {
+                  const all = tomorrowAppointments.map(a => a.id);
+                  setSelectedIds(prev => prev.size === all.length ? new Set() : new Set(all));
+                }}
+                className="flex items-center gap-1.5 text-xs font-medium text-blue-500 hover:text-blue-600 hover:underline"
+              >
+                <MessageSquare className="w-3.5 h-3.5" />
+                {selectedIds.size === tomorrowAppointments.length ? 'Odznacz wszystkie' : 'Zaznacz wszystkie'}
+              </button>
+            </div>
           )}
         </div>
         {tomorrowAppointments.length === 0 ? (
@@ -261,9 +308,23 @@ const AdminDashboard = () => {
             {tomorrowAppointments.map((appt) => {
               const service = services.find(s => s.id === appt.serviceId);
               const employee = employees.find(e => e.id === appt.employeeId);
+              const isSelected = selectedIds.has(appt.id);
               return (
-                <div key={appt.id} className="flex items-center justify-between p-4 rounded-lg bg-secondary/50 hover:bg-secondary/80 transition-colors gap-3">
-                  <div className="flex items-center gap-4 min-w-0">
+                <div
+                  key={appt.id}
+                  className={`flex items-center justify-between p-4 rounded-lg transition-colors gap-3 cursor-pointer ${isSelected ? 'bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800' : 'bg-secondary/50 hover:bg-secondary/80'}`}
+                  onClick={() => setSelectedIds(prev => {
+                    const next = new Set(prev);
+                    next.has(appt.id) ? next.delete(appt.id) : next.add(appt.id);
+                    return next;
+                  })}
+                >
+                  <div className="flex items-center gap-3 min-w-0">
+                    <Checkbox
+                      checked={isSelected}
+                      onCheckedChange={() => {}}
+                      className="shrink-0 pointer-events-none"
+                    />
                     <div className="text-center min-w-[50px] shrink-0">
                       <p className="text-sm font-bold">{format(new Date(appt.date), 'HH:mm')}</p>
                     </div>
@@ -282,10 +343,10 @@ const AdminDashboard = () => {
                     <Button
                       variant="ghost" size="icon" className="h-8 w-8 text-blue-500 hover:text-blue-600 hover:bg-blue-50"
                       title="Wyślij SMS przypomnienie"
-                      disabled={!appt.clientPhone}
-                      onClick={() => sendSmsReminder(appt)}
+                      disabled={!appt.clientPhone || sendingReminders}
+                      onClick={e => { e.stopPropagation(); sendReminders([appt]); }}
                     >
-                      <MessageSquare className="w-4 h-4" />
+                      {sendingReminders ? <Loader2 className="w-4 h-4 animate-spin" /> : <MessageSquare className="w-4 h-4" />}
                     </Button>
                   </div>
                 </div>
