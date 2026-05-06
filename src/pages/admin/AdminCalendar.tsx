@@ -10,7 +10,7 @@ import { toast } from 'sonner';
 import AppointmentDialog, { formatPhoneNumber } from '@/components/admin/AppointmentDialog';
 import { NativeSelect } from '@/components/ui/native-select';
 
-const HOUR_HEIGHT = 56; // px per hour row
+const HOUR_HEIGHT = 64;
 const hours = Array.from({ length: 13 }, (_, i) => i + 8);
 const START_HOUR = 8;
 
@@ -34,8 +34,61 @@ function normalizePhone(phone: string): string {
   return phone.replace(/\D/g, '').slice(-9);
 }
 
+// Build overlap layout for a list of appointments in one column
+function buildLayout(appts: Appointment[]) {
+  const sorted = [...appts].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+  const columns: { end: number; appt: Appointment }[][] = [];
+  const layout = new Map<string, { col: number; totalCols: number }>();
+
+  for (const a of sorted) {
+    const aStart = new Date(a.date).getTime();
+    const aEnd = aStart + a.duration * 60000;
+    let placed = false;
+    for (let c = 0; c < columns.length; c++) {
+      if (aStart >= columns[c][columns[c].length - 1].end) {
+        columns[c].push({ end: aEnd, appt: a });
+        layout.set(a.id, { col: c, totalCols: 0 });
+        placed = true;
+        break;
+      }
+    }
+    if (!placed) {
+      columns.push([{ end: aEnd, appt: a }]);
+      layout.set(a.id, { col: columns.length - 1, totalCols: 0 });
+    }
+  }
+
+  for (const a of sorted) {
+    const aStart = new Date(a.date).getTime();
+    const aEnd = aStart + a.duration * 60000;
+    let maxCol = 0;
+    for (const b of sorted) {
+      const bStart = new Date(b.date).getTime();
+      const bEnd = bStart + b.duration * 60000;
+      if (aStart < bEnd && aEnd > bStart) maxCol = Math.max(maxCol, layout.get(b.id)!.col);
+    }
+    layout.get(a.id)!.totalCols = maxCol + 1;
+  }
+  for (const a of sorted) {
+    const aStart = new Date(a.date).getTime();
+    const aEnd = aStart + a.duration * 60000;
+    const aL = layout.get(a.id)!;
+    for (const b of sorted) {
+      const bStart = new Date(b.date).getTime();
+      const bEnd = bStart + b.duration * 60000;
+      if (aStart < bEnd && aEnd > bStart) {
+        const bL = layout.get(b.id)!;
+        const m = Math.max(aL.totalCols, bL.totalCols);
+        aL.totalCols = m; bL.totalCols = m;
+      }
+    }
+  }
+  return layout;
+}
+
 const AdminCalendar = () => {
   const [currentDate, setCurrentDate] = useState(new Date());
+  const [viewMode, setViewMode] = useState<'week' | 'day'>('week');
   const { appointments, loading: loadingA, addAppointment, updateAppointment, deleteAppointment } = useAppointments();
   const { services, loading: loadingS } = useServices();
   const { employees, loading: loadingE } = useEmployees();
@@ -44,292 +97,240 @@ const AdminCalendar = () => {
   const [apptDialogOpen, setApptDialogOpen] = useState(false);
   const [editingAppointment, setEditingAppointment] = useState<Appointment | null>(null);
   const [newApptDate, setNewApptDate] = useState<Date | null>(null);
-
   const [filterEmployeeId, setFilterEmployeeId] = useState<string>('all');
 
   const isAdmin = currentUser?.role === 'admin';
-
   const visibleEmployees = isAdmin
     ? employees
-    : employees.filter(e =>
-        e.id === currentUser?.id ||
-        (currentUser?.canViewCalendars || []).includes(e.id)
-      );
+    : employees.filter(e => e.id === currentUser?.id || (currentUser?.canViewCalendars || []).includes(e.id));
 
   const filteredAppointments = appointments.filter(a => {
-    const visibleIds = visibleEmployees.map(e => e.id);
-    if (!visibleIds.includes(a.employeeId)) return false;
+    if (!visibleEmployees.map(e => e.id).includes(a.employeeId)) return false;
     if (filterEmployeeId !== 'all' && a.employeeId !== filterEmployeeId) return false;
     return true;
   });
 
   const loading = loadingA || loadingS || loadingE;
-  const weekStart = startOfWeek(currentDate, { weekStartsOn: 1 });
-  const weekDays = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i));
 
-  // --- Auto-save / update client in DB ---
+  // Week: Mon–Sat (6 days)
+  const weekStart = startOfWeek(currentDate, { weekStartsOn: 1 });
+  const weekDays = Array.from({ length: 6 }, (_, i) => addDays(weekStart, i));
+
   const upsertClient = async (name: string, phone: string, email: string) => {
     if (!name || !phone) return;
     const normalized = normalizePhone(phone);
     if (normalized.length < 9) return;
     const existing = clients.find(c => normalizePhone(c.phone) === normalized);
     if (existing) {
-      // Update name/email if changed
-      if (existing.name !== name || existing.email !== (email || existing.email)) {
+      if (existing.name !== name || existing.email !== (email || existing.email))
         await updateClient(existing.id, { name, email: email || existing.email });
-      }
     } else {
-      await addClient({
-        name,
-        phone: formatPhoneNumber(normalized),
-        email: email || '',
-        appointmentIds: [],
-      });
+      await addClient({ name, phone: formatPhoneNumber(normalized), email: email || '', appointmentIds: [] });
     }
   };
 
-  const handleCellClick = (day: Date, hour: number) => {
-    const clickDate = new Date(day);
-    clickDate.setHours(hour, 0, 0, 0);
-    setEditingAppointment(null);
-    setNewApptDate(clickDate);
-    setApptDialogOpen(true);
+  const openNew = (day: Date, hour: number) => {
+    const d = new Date(day); d.setHours(hour, 0, 0, 0);
+    setEditingAppointment(null); setNewApptDate(d); setApptDialogOpen(true);
   };
 
-  const handleAppointmentClick = (e: React.MouseEvent, appt: Appointment) => {
+  const openEdit = (e: React.MouseEvent, appt: Appointment) => {
     e.stopPropagation();
-    setNewApptDate(null);
-    setEditingAppointment(appt);
-    setApptDialogOpen(true);
+    setNewApptDate(null); setEditingAppointment(appt); setApptDialogOpen(true);
   };
 
   const handleSaveAppointment = async (data: Appointment) => {
     try {
-      if (editingAppointment) {
-        const { id, ...rest } = data;
-        await updateAppointment(id, rest);
-        toast.success('Wizyta zaktualizowana');
-      } else {
-        const { id: _id, ...rest } = data;
-        await addAppointment(rest);
-        toast.success('Wizyta dodana');
-      }
+      if (editingAppointment) { const { id, ...rest } = data; await updateAppointment(id, rest); toast.success('Wizyta zaktualizowana'); }
+      else { const { id: _id, ...rest } = data; await addAppointment(rest); toast.success('Wizyta dodana'); }
       await upsertClient(data.clientName, data.clientPhone, data.clientEmail);
     } catch { toast.error('Błąd zapisu'); }
   };
 
   const handleDeleteAppointment = async (id: string) => {
-    try {
-      await deleteAppointment(id);
-      toast.success('Wizyta usunięta');
-    } catch { toast.error('Błąd usuwania'); }
+    try { await deleteAppointment(id); toast.success('Wizyta usunięta'); }
+    catch { toast.error('Błąd usuwania'); }
   };
-
-  const goToToday = () => setCurrentDate(new Date());
 
   if (loading) return <div className="flex items-center justify-center py-20"><Loader2 className="w-6 h-6 animate-spin text-primary" /></div>;
 
-  // Get appointments for a specific day
-  const getDayAppointments = (day: Date) => {
-    return filteredAppointments.filter(a => isSameDay(new Date(a.date), day));
+  const getDayAppointments = (day: Date, empId?: string) =>
+    filteredAppointments.filter(a =>
+      isSameDay(new Date(a.date), day) && (empId ? a.employeeId === empId : true)
+    );
+
+  // Day view: employees that have appointments OR all visible (if filtered)
+  const dayViewEmployees = filterEmployeeId !== 'all'
+    ? visibleEmployees.filter(e => e.id === filterEmployeeId)
+    : visibleEmployees;
+
+  const navigate = (dir: 1 | -1) => {
+    setCurrentDate(d => addDays(d, viewMode === 'day' ? dir : dir * 7));
+  };
+
+  const rangeLabel = viewMode === 'week'
+    ? `${format(weekDays[0], 'd MMM', { locale: pl })} – ${format(weekDays[5], 'd MMM yyyy', { locale: pl })}`
+    : format(currentDate, 'EEEE, d MMMM yyyy', { locale: pl });
+
+  // Shared appointment card renderer
+  const ApptCard = ({ a, topPx, heightPx, widthPct, leftPct }: {
+    a: Appointment; topPx: number; heightPx: number; widthPct: number; leftPct: number;
+  }) => {
+    const aDate = new Date(a.date);
+    const service = services.find(s => s.id === a.serviceId);
+    const employee = employees.find(e => e.id === a.employeeId);
+    const empColor = getEmployeeColor(a.employeeId, employees);
+    const h = Math.max(heightPx, 24);
+    return (
+      <div
+        onClick={(e) => openEdit(e, a)}
+        className={`absolute z-10 rounded-md px-2 py-1 text-xs cursor-pointer border-l-[3px] transition-all hover:shadow-md hover:z-20 overflow-hidden ${empColor.bg} ${empColor.border} ${empColor.text}`}
+        style={{ top: `${topPx}px`, height: `${h}px`, left: `calc(${leftPct}% + 1px)`, width: `calc(${widthPct}% - 3px)` }}
+        title={`${a.clientName}${service ? ` – ${service.name}` : ''}${a.notes ? `\n${a.notes}` : ''}`}
+      >
+        <p className="font-bold truncate leading-tight">{a.clientName}</p>
+        {h > 28 && <p className="truncate opacity-75 leading-tight">{format(aDate, 'HH:mm')} · {service?.name || 'Wizyta'}</p>}
+        {h > 48 && a.clientPhone && <p className="truncate opacity-65 leading-tight">📞 {formatPhoneNumber(a.clientPhone)}</p>}
+        {h > 64 && a.notes && <p className="truncate opacity-60 leading-tight italic">📝 {a.notes}</p>}
+        {h > 80 && employee && viewMode === 'week' && <p className="truncate opacity-50 leading-tight">{employee.name}</p>}
+      </div>
+    );
+  };
+
+  // Column renderer (shared between week-day and day-employee columns)
+  const TimeColumn = ({ day, empId }: { day: Date; empId?: string }) => {
+    const appts = getDayAppointments(day, empId);
+    const layout = buildLayout(appts);
+    return (
+      <div className="border-l border-border/40 relative">
+        {hours.map(hour => (
+          <div
+            key={hour}
+            className="border-b border-border/40 group cursor-pointer hover:bg-secondary/30 transition-colors"
+            style={{ height: HOUR_HEIGHT }}
+            onClick={() => openNew(day, hour)}
+          >
+            <div className="flex items-center justify-center h-full opacity-0 group-hover:opacity-100 transition-opacity">
+              <Plus className="w-4 h-4 text-muted-foreground/40" />
+            </div>
+          </div>
+        ))}
+        {appts.map(a => {
+          const aDate = new Date(a.date);
+          const startHour = aDate.getHours() + aDate.getMinutes() / 60;
+          const topPx = (startHour - START_HOUR) * HOUR_HEIGHT;
+          const heightPx = (a.duration / 60) * HOUR_HEIGHT;
+          if (topPx < 0 || topPx >= hours.length * HOUR_HEIGHT) return null;
+          const l = layout.get(a.id) || { col: 0, totalCols: 1 };
+          const widthPct = 100 / l.totalCols;
+          const leftPct = l.col * widthPct;
+          return <ApptCard key={a.id} a={a} topPx={topPx} heightPx={heightPx} widthPct={widthPct} leftPct={leftPct} />;
+        })}
+      </div>
+    );
   };
 
   return (
     <div className="space-y-4">
+      {/* Toolbar */}
       <div className="flex items-center justify-between flex-wrap gap-3">
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2">
           <h1 className="font-heading text-2xl font-bold">Kalendarz</h1>
-          <Button variant="outline" size="sm" onClick={goToToday}>Dziś</Button>
+          <Button variant="outline" size="sm" onClick={() => setCurrentDate(new Date())}>Dziś</Button>
         </div>
         <div className="flex items-center gap-2 flex-wrap">
+          {/* View toggle */}
+          <div className="flex rounded-lg border border-border overflow-hidden text-sm">
+            <button
+              className={`px-3 py-1.5 transition-colors ${viewMode === 'week' ? 'bg-primary text-primary-foreground' : 'hover:bg-secondary/60'}`}
+              onClick={() => setViewMode('week')}
+            >Tydzień</button>
+            <button
+              className={`px-3 py-1.5 border-l border-border transition-colors ${viewMode === 'day' ? 'bg-primary text-primary-foreground' : 'hover:bg-secondary/60'}`}
+              onClick={() => setViewMode('day')}
+            >Dzień</button>
+          </div>
+
           {visibleEmployees.length > 1 && (
-            <div className="w-[180px]">
-              <NativeSelect value={filterEmployeeId} onChange={(e) => setFilterEmployeeId(e.target.value)} className="h-8 py-1 pr-8 text-sm">
-                <option value="all">Wszyscy pracownicy</option>
-                {visibleEmployees.map(e => (
-                  <option key={e.id} value={e.id}>{e.name}</option>
-                ))}
-              </NativeSelect>
-            </div>
+            <NativeSelect value={filterEmployeeId} onChange={e => setFilterEmployeeId(e.target.value)} className="h-8 py-1 pr-8 text-sm w-[180px]">
+              <option value="all">Wszyscy pracownicy</option>
+              {visibleEmployees.map(e => <option key={e.id} value={e.id}>{e.name}</option>)}
+            </NativeSelect>
           )}
-          <div className="flex items-center gap-1 ml-2">
-            <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setCurrentDate(d => addDays(d, -7))}>
-              <ChevronLeft className="w-4 h-4" />
-            </Button>
-            <span className="text-sm font-medium min-w-[180px] text-center">
-              {format(weekDays[0], 'd MMM', { locale: pl })} – {format(weekDays[6], 'd MMM yyyy', { locale: pl })}
-            </span>
-            <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setCurrentDate(d => addDays(d, 7))}>
-              <ChevronRight className="w-4 h-4" />
-            </Button>
+
+          <div className="flex items-center gap-1">
+            <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => navigate(-1)}><ChevronLeft className="w-4 h-4" /></Button>
+            <span className="text-sm font-medium min-w-[200px] text-center capitalize">{rangeLabel}</span>
+            <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => navigate(1)}><ChevronRight className="w-4 h-4" /></Button>
           </div>
         </div>
       </div>
 
       <div className="bg-card rounded-xl border border-border shadow-sm overflow-auto">
-        <div className="min-w-[800px]">
-          {/* Header row */}
-          <div className="grid grid-cols-[56px_repeat(7,1fr)] border-b border-border sticky top-0 bg-card z-10">
-            <div className="p-2" />
-            {weekDays.map((day) => {
-              const isToday = isSameDay(day, new Date());
-              return (
-                <div key={day.toISOString()} className="p-2 text-center border-l border-border">
-                  <p className="text-xs text-muted-foreground uppercase tracking-wide">
-                    {format(day, 'EEE', { locale: pl })}
-                  </p>
-                  <div className={`inline-flex items-center justify-center w-9 h-9 rounded-full text-lg font-semibold mt-0.5 ${
-                    isToday ? 'bg-primary text-primary-foreground' : 'text-foreground'
-                  }`}>
-                    {format(day, 'd')}
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-
-          {/* Body: time grid with absolutely positioned appointments */}
-          <div className="grid grid-cols-[56px_repeat(7,1fr)] relative">
-            {/* Time labels column */}
-            <div>
-              {hours.map((hour) => (
-                <div key={hour} className="pr-2 text-[11px] text-muted-foreground text-right border-b border-border/40" style={{ height: HOUR_HEIGHT }}>
-                  <span className="-translate-y-2 inline-block">{hour}:00</span>
-                </div>
-              ))}
-            </div>
-
-            {/* Day columns */}
-            {weekDays.map((day) => {
-              const dayAppts = getDayAppointments(day);
-
-              return (
-                <div key={day.toISOString()} className="border-l border-border/40 relative">
-                  {/* Hour cells (for click targets & grid lines) */}
-                  {hours.map((hour) => (
-                    <div
-                      key={hour}
-                      className="border-b border-border/40 group cursor-pointer hover:bg-secondary/30 transition-colors"
-                      style={{ height: HOUR_HEIGHT }}
-                      onClick={() => handleCellClick(day, hour)}
-                    >
-                      <div className="flex items-center justify-center h-full opacity-0 group-hover:opacity-100 transition-opacity">
-                        <Plus className="w-4 h-4 text-muted-foreground/40" />
-                      </div>
+        {viewMode === 'week' ? (
+          // --- WEEK VIEW: Mon–Sat ---
+          <div style={{ minWidth: 700 }}>
+            <div className={`grid border-b border-border sticky top-0 bg-card z-10`} style={{ gridTemplateColumns: `56px repeat(6, 1fr)` }}>
+              <div className="p-2" />
+              {weekDays.map(day => {
+                const isToday = isSameDay(day, new Date());
+                return (
+                  <div
+                    key={day.toISOString()}
+                    className="p-2 text-center border-l border-border cursor-pointer hover:bg-secondary/40 transition-colors"
+                    onClick={() => { setCurrentDate(day); setViewMode('day'); }}
+                  >
+                    <p className="text-xs text-muted-foreground uppercase tracking-wide">{format(day, 'EEE', { locale: pl })}</p>
+                    <div className={`inline-flex items-center justify-center w-9 h-9 rounded-full text-lg font-semibold mt-0.5 ${isToday ? 'bg-primary text-primary-foreground' : 'text-foreground'}`}>
+                      {format(day, 'd')}
                     </div>
-                  ))}
-
-                  {/* Appointments overlay */}
-                  {(() => {
-                    // Calculate columns for overlapping appointments
-                    const sorted = [...dayAppts].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
-                    const columns: { end: number; appt: typeof sorted[0] }[][] = [];
-                    const apptLayout = new Map<string, { col: number; totalCols: number }>();
-
-                    for (const a of sorted) {
-                      const aStart = new Date(a.date).getTime();
-                      const aEnd = aStart + a.duration * 60000;
-                      let placed = false;
-                      for (let c = 0; c < columns.length; c++) {
-                        const lastInCol = columns[c][columns[c].length - 1];
-                        if (aStart >= lastInCol.end) {
-                          columns[c].push({ end: aEnd, appt: a });
-                          apptLayout.set(a.id, { col: c, totalCols: 0 });
-                          placed = true;
-                          break;
-                        }
-                      }
-                      if (!placed) {
-                        columns.push([{ end: aEnd, appt: a }]);
-                        apptLayout.set(a.id, { col: columns.length - 1, totalCols: 0 });
-                      }
-                    }
-
-                    // Determine totalCols for each group of overlapping appointments
-                    for (const a of sorted) {
-                      const aStart = new Date(a.date).getTime();
-                      const aEnd = aStart + a.duration * 60000;
-                      let maxCol = 0;
-                      for (const b of sorted) {
-                        const bStart = new Date(b.date).getTime();
-                        const bEnd = bStart + b.duration * 60000;
-                        if (aStart < bEnd && aEnd > bStart) {
-                          const bLayout = apptLayout.get(b.id);
-                          if (bLayout) maxCol = Math.max(maxCol, bLayout.col);
-                        }
-                      }
-                      const layout = apptLayout.get(a.id)!;
-                      layout.totalCols = Math.max(layout.totalCols, maxCol + 1);
-                    }
-                    // Second pass to propagate totalCols
-                    for (const a of sorted) {
-                      const aStart = new Date(a.date).getTime();
-                      const aEnd = aStart + a.duration * 60000;
-                      const aLayout = apptLayout.get(a.id)!;
-                      for (const b of sorted) {
-                        const bStart = new Date(b.date).getTime();
-                        const bEnd = bStart + b.duration * 60000;
-                        if (aStart < bEnd && aEnd > bStart) {
-                          const bLayout = apptLayout.get(b.id)!;
-                          const maxCols = Math.max(aLayout.totalCols, bLayout.totalCols);
-                          aLayout.totalCols = maxCols;
-                          bLayout.totalCols = maxCols;
-                        }
-                      }
-                    }
-
-                    return dayAppts.map((a) => {
-                      const aDate = new Date(a.date);
-                      const startHour = aDate.getHours() + aDate.getMinutes() / 60;
-                      const topPx = (startHour - START_HOUR) * HOUR_HEIGHT;
-                      const heightPx = (a.duration / 60) * HOUR_HEIGHT;
-                      const service = services.find(s => s.id === a.serviceId);
-                      const employee = employees.find(e => e.id === a.employeeId);
-                      const empColor = getEmployeeColor(a.employeeId, employees);
-                      const layout = apptLayout.get(a.id) || { col: 0, totalCols: 1 };
-
-                      if (topPx < 0 || topPx >= hours.length * HOUR_HEIGHT) return null;
-
-                      const widthPercent = 100 / layout.totalCols;
-                      const leftPercent = layout.col * widthPercent;
-
-                      return (
-                        <div
-                          key={a.id}
-                          onClick={(e) => handleAppointmentClick(e, a)}
-                          className={`absolute z-10 rounded-md px-1.5 py-1 text-xs cursor-pointer border-l-[3px] transition-all hover:shadow-md hover:z-20 overflow-hidden ${empColor.bg} ${empColor.border} ${empColor.text}`}
-                          style={{
-                            top: `${topPx}px`,
-                            height: `${Math.max(heightPx, 24)}px`,
-                            left: `${leftPercent}%`,
-                            width: `calc(${widthPercent}% - 2px)`,
-                          }}
-                          title={`${a.clientName}${service ? ` – ${service.name}` : ''}${a.notes ? `\n${a.notes}` : ''}`}
-                        >
-                          <p className="font-bold truncate leading-tight">
-                            {a.clientName}
-                          </p>
-                          <p className="truncate opacity-70 leading-tight">
-                            {format(aDate, 'HH:mm')} · {service?.name || 'Wizyta'}
-                          </p>
-                          {heightPx > 40 && a.clientPhone && (
-                            <p className="truncate opacity-70 leading-tight">📞 {formatPhoneNumber(a.clientPhone)}</p>
-                          )}
-                          {heightPx > 56 && a.notes && (
-                            <p className="truncate opacity-60 leading-tight italic">📝 {a.notes}</p>
-                          )}
-                          {heightPx > 72 && employee && (
-                            <p className="truncate opacity-50 leading-tight">{employee.name}</p>
-                          )}
-                        </div>
-                      );
-                    });
-                  })()}
-                </div>
-              );
-            })}
+                  </div>
+                );
+              })}
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: `56px repeat(6, 1fr)` }} className="relative">
+              <div>
+                {hours.map(hour => (
+                  <div key={hour} className="pr-2 text-[11px] text-muted-foreground text-right border-b border-border/40" style={{ height: HOUR_HEIGHT }}>
+                    <span className="-translate-y-2 inline-block">{hour}:00</span>
+                  </div>
+                ))}
+              </div>
+              {weekDays.map(day => <TimeColumn key={day.toISOString()} day={day} />)}
+            </div>
           </div>
-        </div>
+        ) : (
+          // --- DAY VIEW: one column per employee ---
+          <div style={{ minWidth: Math.max(500, 56 + dayViewEmployees.length * 160) }}>
+            <div className="sticky top-0 bg-card z-10 border-b border-border"
+              style={{ display: 'grid', gridTemplateColumns: `56px repeat(${dayViewEmployees.length}, 1fr)` }}>
+              <div className="p-2" />
+              {dayViewEmployees.map(emp => {
+                const empColor = getEmployeeColor(emp.id, employees);
+                return (
+                  <div key={emp.id} className={`p-3 text-center border-l border-border`}>
+                    <div className={`inline-block px-2 py-0.5 rounded-full text-xs font-semibold ${empColor.bg} ${empColor.text}`}>
+                      {emp.name}
+                    </div>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      {getDayAppointments(currentDate, emp.id).length} wizyt
+                    </p>
+                  </div>
+                );
+              })}
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: `56px repeat(${dayViewEmployees.length}, 1fr)` }} className="relative">
+              <div>
+                {hours.map(hour => (
+                  <div key={hour} className="pr-2 text-[11px] text-muted-foreground text-right border-b border-border/40" style={{ height: HOUR_HEIGHT }}>
+                    <span className="-translate-y-2 inline-block">{hour}:00</span>
+                  </div>
+                ))}
+              </div>
+              {dayViewEmployees.map(emp => <TimeColumn key={emp.id} day={currentDate} empId={emp.id} />)}
+            </div>
+          </div>
+        )}
       </div>
 
       <AppointmentDialog
@@ -342,7 +343,6 @@ const AdminCalendar = () => {
         onSave={handleSaveAppointment}
         onDelete={handleDeleteAppointment}
       />
-
     </div>
   );
 };
