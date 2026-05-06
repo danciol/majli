@@ -40,25 +40,23 @@ export function ContactSection() {
                 <a href="tel:+48782696143" className="font-medium hover:text-primary transition-colors">+48 782 696 143</a>
               </div>
             </div>
-            <div className="flex gap-3 pt-2">
-              <a
-                href="https://www.facebook.com/majli.paznokcie"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center hover:bg-primary/20 transition-colors"
-                aria-label="Facebook"
-              >
+            <div className="flex items-start gap-4">
+              <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
                 <Facebook className="w-5 h-5 text-primary" />
-              </a>
-              <a
-                href="https://www.instagram.com/majli.beauty/"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center hover:bg-primary/20 transition-colors"
-                aria-label="Instagram"
-              >
+              </div>
+              <div>
+                <p className="text-sm text-muted-foreground">Facebook</p>
+                <a href="https://www.facebook.com/majli.paznokcie" target="_blank" rel="noopener noreferrer" className="font-medium hover:text-primary transition-colors">majli.paznokcie</a>
+              </div>
+            </div>
+            <div className="flex items-start gap-4">
+              <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
                 <Instagram className="w-5 h-5 text-primary" />
-              </a>
+              </div>
+              <div>
+                <p className="text-sm text-muted-foreground">Instagram</p>
+                <a href="https://www.instagram.com/majli.beauty/" target="_blank" rel="noopener noreferrer" className="font-medium hover:text-primary transition-colors">majli.beauty</a>
+              </div>
             </div>
           </motion.div>
 
@@ -69,8 +67,8 @@ export function ContactSection() {
             className="glass-card overflow-hidden rounded-xl h-72 md:h-full min-h-[280px]"
           >
             <iframe
-              title="Lokalizacja Majli Beauty"
-              src="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d2443.916!2d21.012!3d52.229!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x0%3A0x0!2zNTLCsDEzJzQ0LjQiTiAyMcKwMDAnNDMuMiJF!5e0!3m2!1spl!2spl!4v1"
+              title="Lokalizacja MajLi Beauty"
+              src="https://maps.google.com/maps?q=Bajdy+200,+38-471+Wojasz%C3%B3wka,+Polska&output=embed&hl=pl"
               className="w-full h-full border-0"
               allowFullScreen
               loading="lazy"
