@@ -59,7 +59,7 @@ export function HeroSection({ onBooking }: HeroProps) {
               size="lg"
               variant="outline"
               onClick={() => document.querySelector('#o-nas')?.scrollIntoView({ behavior: 'smooth' })}
-              className="border-cream/30 text-cream hover:bg-cream/10 text-base px-8 py-6"
+              className="border-cream/50 text-cream bg-transparent hover:bg-cream/10 hover:text-cream text-base px-8 py-6"
             >
               Poznaj nas
             </Button>
