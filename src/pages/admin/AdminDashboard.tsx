@@ -34,7 +34,7 @@ const depositLabels: Record<string, string> = {
   refunded: '↩️ Zwrócona',
 };
 
-const DEFAULT_TEMPLATE = 'Przypomnienie: wizyta w salonie Majli Beauty {data} o godz. {godzina} ({zabieg}, {pracownik}). Do zobaczenia!';
+const DEFAULT_TEMPLATE = 'Przypomnienie: wizyta w salonie MajLi Beauty {data} o godz. {godzina} ({zabieg}, {pracownik}). Do zobaczenia!';
 
 const AdminDashboard = () => {
   const { appointments, loading: loadingA, updateAppointment } = useAppointments();

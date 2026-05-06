@@ -1,12 +1,5 @@
 import { motion } from 'framer-motion';
-import { Phone, Mail, MapPin, Clock, Instagram } from 'lucide-react';
-
-const info = [
-  { icon: MapPin, label: 'Adres', value: 'ul. Piękna 15, 00-001 Warszawa' },
-  { icon: Phone, label: 'Telefon', value: '+48 000 000 000' },
-  { icon: Mail, label: 'Email', value: 'kontakt@majlibeauty.pl' },
-  { icon: Clock, label: 'Godziny', value: 'Pon-Pt: 9:00-18:00 | Sob: 9:00-14:00' },
-];
+import { Phone, MapPin, Facebook, Instagram } from 'lucide-react';
 
 export function ContactSection() {
   return (
@@ -29,20 +22,38 @@ export function ContactSection() {
             viewport={{ once: true }}
             className="space-y-6"
           >
-            {info.map((item) => (
-              <div key={item.label} className="flex items-start gap-4">
-                <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
-                  <item.icon className="w-5 h-5 text-primary" />
-                </div>
-                <div>
-                  <p className="text-sm text-muted-foreground">{item.label}</p>
-                  <p className="font-medium">{item.value}</p>
-                </div>
+            <div className="flex items-start gap-4">
+              <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
+                <MapPin className="w-5 h-5 text-primary" />
               </div>
-            ))}
-            <div className="flex gap-3 pt-4">
+              <div>
+                <p className="text-sm text-muted-foreground">Adres</p>
+                <p className="font-medium">Bajdy 200, 38-471 Wojaszówka</p>
+              </div>
+            </div>
+            <div className="flex items-start gap-4">
+              <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
+                <Phone className="w-5 h-5 text-primary" />
+              </div>
+              <div>
+                <p className="text-sm text-muted-foreground">Telefon</p>
+                <a href="tel:+48782696143" className="font-medium hover:text-primary transition-colors">+48 782 696 143</a>
+              </div>
+            </div>
+            <div className="flex gap-3 pt-2">
               <a
-                href="#"
+                href="https://www.facebook.com/majli.paznokcie"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center hover:bg-primary/20 transition-colors"
+                aria-label="Facebook"
+              >
+                <Facebook className="w-5 h-5 text-primary" />
+              </a>
+              <a
+                href="https://www.instagram.com/majli.beauty/"
+                target="_blank"
+                rel="noopener noreferrer"
                 className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center hover:bg-primary/20 transition-colors"
                 aria-label="Instagram"
               >

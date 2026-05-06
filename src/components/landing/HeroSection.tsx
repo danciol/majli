@@ -14,7 +14,7 @@ export function HeroSection({ onBooking }: HeroProps) {
       <div className="absolute inset-0">
         <img
           src={heroImage}
-          alt="Wnętrze salonu Majli Beauty"
+          alt="Wnętrze salonu MajLi Beauty"
           className="w-full h-full object-cover"
           width={1920}
           height={1080}
@@ -39,7 +39,7 @@ export function HeroSection({ onBooking }: HeroProps) {
             Salon Kosmetyczny
           </motion.p>
           <h1 className="font-heading text-5xl md:text-6xl lg:text-7xl font-bold text-cream leading-tight mb-6">
-            Majli
+            MajLi
             <br />
             <span className="text-gold">Beauty</span>
           </h1>

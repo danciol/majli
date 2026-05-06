@@ -27,7 +27,7 @@ export function Navbar({ onBooking }: NavbarProps) {
     <nav className="fixed top-0 left-0 right-0 z-50 bg-background/90 backdrop-blur-md border-b border-border/50">
       <div className="container mx-auto flex items-center justify-between h-16 md:h-20 px-4">
         <Link to="/" className="font-heading text-2xl md:text-3xl font-bold text-primary tracking-wide">
-          Majli Beauty
+          MajLi Beauty
         </Link>
 
         {/* Desktop */}
@@ -77,8 +77,8 @@ export function Navbar({ onBooking }: NavbarProps) {
           >
             Umów wizytę
           </Button>
-          <a href="tel:+48000000000" className="flex items-center gap-2 text-muted-foreground text-sm py-1">
-            <Phone size={14} /> +48 000 000 000
+          <a href="tel:+48782696143" className="flex items-center gap-2 text-muted-foreground text-sm py-1">
+            <Phone size={14} /> +48 782 696 143
           </a>
         </div>
       )}
