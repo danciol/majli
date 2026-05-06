@@ -100,9 +100,10 @@ const AdminCalendar = () => {
   const [filterEmployeeId, setFilterEmployeeId] = useState<string>('all');
 
   const isAdmin = currentUser?.role === 'admin';
-  const visibleEmployees = isAdmin
+  const visibleEmployees = (isAdmin
     ? employees
-    : employees.filter(e => e.id === currentUser?.id || (currentUser?.canViewCalendars || []).includes(e.id));
+    : employees.filter(e => e.id === currentUser?.id || (currentUser?.canViewCalendars || []).includes(e.id))
+  ).filter(e => (e.role || 'pracownik') !== 'salon');
 
   const filteredAppointments = appointments.filter(a => {
     if (!visibleEmployees.map(e => e.id).includes(a.employeeId)) return false;

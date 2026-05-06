@@ -104,15 +104,17 @@ const AppointmentDialog = ({
       ))
     : services.filter(s => s.active !== false);
 
+  const bookableEmployees = employees.filter(e => (e.role || 'pracownik') !== 'salon');
+
   const matchedEmployees = serviceId
-    ? employees.filter((employee) =>
+    ? bookableEmployees.filter((employee) =>
         employee.services?.includes(serviceId) ||
         selectedService?.employeeIds?.includes(employee.id) ||
         selectedService?.employees?.includes(employee.id)
       )
-    : employees;
+    : bookableEmployees;
 
-  const availableEmployees = matchedEmployees.length > 0 ? matchedEmployees : employees;
+  const availableEmployees = matchedEmployees.length > 0 ? matchedEmployees : bookableEmployees;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>

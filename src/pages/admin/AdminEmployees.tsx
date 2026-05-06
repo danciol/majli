@@ -210,6 +210,7 @@ const AdminEmployees = () => {
                 <SelectContent>
                   <SelectItem value="admin">Admin</SelectItem>
                   <SelectItem value="pracownik">Pracownik</SelectItem>
+                  <SelectItem value="salon">Salon (recepcja)</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -224,31 +225,35 @@ const AdminEmployees = () => {
               </div>
             </div>
 
-            <div>
-              <Label className="mb-2 block">Godziny pracy</Label>
-              <div className="space-y-2">
-                {DAYS.map(({ key, label }) => (
-                  <div key={key} className="flex items-center gap-3">
-                    <span className="text-sm w-28 shrink-0">{label}</span>
-                    <Input
-                      value={form.workingHours[key] || ''}
-                      onChange={e => setWH(key, e.target.value)}
-                      placeholder="np. 6:00-22:00 lub wolne"
-                      className="text-sm"
-                    />
+            {form.role !== 'salon' && (
+              <>
+                <div>
+                  <Label className="mb-2 block">Godziny pracy</Label>
+                  <div className="space-y-2">
+                    {DAYS.map(({ key, label }) => (
+                      <div key={key} className="flex items-center gap-3">
+                        <span className="text-sm w-28 shrink-0">{label}</span>
+                        <Input
+                          value={form.workingHours[key] || ''}
+                          onChange={e => setWH(key, e.target.value)}
+                          placeholder="np. 6:00-22:00 lub wolne"
+                          className="text-sm"
+                        />
+                      </div>
+                    ))}
                   </div>
-                ))}
-              </div>
-            </div>
+                </div>
 
-            <div>
-              <Label>Dni wolne (daty oddzielone przecinkami, np. 2026-04-11, 2026-04-25)</Label>
-              <Input
-                value={form.daysOff}
-                onChange={e => setForm(f => ({ ...f, daysOff: e.target.value }))}
-                placeholder="2026-04-11, 2026-04-25"
-              />
-            </div>
+                <div>
+                  <Label>Dni wolne (daty oddzielone przecinkami, np. 2026-04-11, 2026-04-25)</Label>
+                  <Input
+                    value={form.daysOff}
+                    onChange={e => setForm(f => ({ ...f, daysOff: e.target.value }))}
+                    placeholder="2026-04-11, 2026-04-25"
+                  />
+                </div>
+              </>
+            )}
 
             {form.role === 'pracownik' && (
               <div>
