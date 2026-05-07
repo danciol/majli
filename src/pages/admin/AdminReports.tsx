@@ -1,11 +1,10 @@
-import { useMemo } from 'react';
+import { useMemo, useState, useEffect } from 'react';
 import { useAppointments, useServices, useEmployees } from '@/hooks/useFirestore';
-import { TrendingUp, Users, Scissors, CreditCard, Loader2, Eye } from 'lucide-react';
-import { format, startOfMonth, endOfMonth, subMonths, isWithinInterval } from 'date-fns';
+import { TrendingUp, Users, Scissors, CreditCard, Loader2, Eye, Filter } from 'lucide-react';
+import { format, startOfMonth, endOfMonth, subMonths, isWithinInterval, parseISO, startOfDay, endOfDay } from 'date-fns';
 import { pl } from 'date-fns/locale';
 import { collection, query, orderBy, onSnapshot } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
-import { useState, useEffect } from 'react';
 
 interface PhoneReveal {
   id: string;
@@ -20,7 +19,10 @@ const AdminReports = () => {
   const { services, loading: loadingS } = useServices();
   const { employees, loading: loadingE } = useEmployees();
   const [phoneReveals, setPhoneReveals] = useState<PhoneReveal[]>([]);
-  const [period, setPeriod] = useState<'current' | 'last'>('current');
+
+  const [dateFrom, setDateFrom] = useState(() => format(startOfMonth(new Date()), 'yyyy-MM-dd'));
+  const [dateTo, setDateTo] = useState(() => format(endOfMonth(new Date()), 'yyyy-MM-dd'));
+  const [selectedEmployee, setSelectedEmployee] = useState<string>('all');
 
   useEffect(() => {
     const q = query(collection(db, 'phone_reveals'), orderBy('revealedAt', 'desc'));
@@ -32,14 +34,26 @@ const AdminReports = () => {
 
   const loading = loadingA || loadingS || loadingE;
 
-  const periodStart = period === 'current' ? startOfMonth(new Date()) : startOfMonth(subMonths(new Date(), 1));
-  const periodEnd   = period === 'current' ? endOfMonth(new Date())   : endOfMonth(subMonths(new Date(), 1));
+  const setPreset = (preset: 'current' | 'last') => {
+    const base = preset === 'current' ? new Date() : subMonths(new Date(), 1);
+    setDateFrom(format(startOfMonth(base), 'yyyy-MM-dd'));
+    setDateTo(format(endOfMonth(base), 'yyyy-MM-dd'));
+  };
+
+  const periodStart = startOfDay(parseISO(dateFrom));
+  const periodEnd   = endOfDay(parseISO(dateTo));
+
+  const isCurrent = dateFrom === format(startOfMonth(new Date()), 'yyyy-MM-dd') && dateTo === format(endOfMonth(new Date()), 'yyyy-MM-dd');
+  const isLast    = dateFrom === format(startOfMonth(subMonths(new Date(), 1)), 'yyyy-MM-dd') && dateTo === format(endOfMonth(subMonths(new Date(), 1)), 'yyyy-MM-dd');
 
   const periodAppointments = useMemo(() =>
     appointments.filter(a => {
       const d = new Date(a.date);
-      return isWithinInterval(d, { start: periodStart, end: periodEnd }) && a.status !== 'cancelled';
-    }), [appointments, periodStart, periodEnd]);
+      if (!isWithinInterval(d, { start: periodStart, end: periodEnd })) return false;
+      if (a.status === 'cancelled') return false;
+      if (selectedEmployee !== 'all' && a.employeeId !== selectedEmployee) return false;
+      return true;
+    }), [appointments, periodStart, periodEnd, selectedEmployee]);
 
   const revenue = useMemo(() =>
     periodAppointments.reduce((sum, a) => {
@@ -51,13 +65,17 @@ const AdminReports = () => {
     periodAppointments.reduce((sum, a) => sum + (a.depositStatus === 'paid' ? (a.depositAmount || 0) : 0), 0),
     [periodAppointments]);
 
+  const visibleEmployees = selectedEmployee === 'all'
+    ? employees
+    : employees.filter(e => e.id === selectedEmployee);
+
   const byEmployee = useMemo(() =>
-    employees.map(e => {
+    visibleEmployees.map(e => {
       const appts = periodAppointments.filter(a => a.employeeId === e.id);
       const rev = appts.reduce((sum, a) => sum + (services.find(s => s.id === a.serviceId)?.price || 0), 0);
       const reveals = phoneReveals.filter(r => r.employeeName === e.name).length;
       return { ...e, count: appts.length, revenue: rev, reveals };
-    }).sort((a, b) => b.count - a.count), [employees, periodAppointments, services, phoneReveals]);
+    }).sort((a, b) => b.count - a.count), [visibleEmployees, periodAppointments, services, phoneReveals]);
 
   const byService = useMemo(() =>
     services.map(s => {
@@ -66,26 +84,90 @@ const AdminReports = () => {
     }).filter(s => s.count > 0).sort((a, b) => b.count - a.count),
     [services, periodAppointments]);
 
+  const filteredReveals = useMemo(() => {
+    if (selectedEmployee === 'all') return phoneReveals;
+    const emp = employees.find(e => e.id === selectedEmployee);
+    return emp ? phoneReveals.filter(r => r.employeeName === emp.name) : phoneReveals;
+  }, [phoneReveals, selectedEmployee, employees]);
+
   if (loading) return <div className="flex items-center justify-center py-20"><Loader2 className="w-6 h-6 animate-spin text-primary" /></div>;
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between flex-wrap gap-3">
-        <div>
-          <h1 className="font-heading text-2xl font-bold flex items-center gap-2">
-            <TrendingUp className="w-6 h-6 text-primary" />Raporty
-          </h1>
-          <p className="text-sm text-muted-foreground mt-1">
-            {format(periodStart, 'LLLL yyyy', { locale: pl })}
-          </p>
+      <div>
+        <h1 className="font-heading text-2xl font-bold flex items-center gap-2">
+          <TrendingUp className="w-6 h-6 text-primary" />Raporty
+        </h1>
+        <p className="text-sm text-muted-foreground mt-1">
+          {format(periodStart, 'd MMM yyyy', { locale: pl })} — {format(periodEnd, 'd MMM yyyy', { locale: pl })}
+        </p>
+      </div>
+
+      {/* Filtry */}
+      <div className="glass-card p-4 space-y-4">
+        <div className="flex items-center gap-2 text-sm font-medium">
+          <Filter className="w-4 h-4 text-primary" />
+          Filtry
         </div>
-        <div className="flex gap-2">
-          <button onClick={() => setPeriod('current')} className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${period==='current' ? 'bg-primary text-primary-foreground' : 'bg-secondary text-muted-foreground hover:text-foreground'}`}>
-            Bieżący miesiąc
-          </button>
-          <button onClick={() => setPeriod('last')} className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${period==='last' ? 'bg-primary text-primary-foreground' : 'bg-secondary text-muted-foreground hover:text-foreground'}`}>
-            Poprzedni miesiąc
-          </button>
+
+        <div className="flex flex-wrap gap-3 items-end">
+          {/* Szybki wybór okresu */}
+          <div className="space-y-1">
+            <p className="text-xs text-muted-foreground">Szybki wybór</p>
+            <div className="flex gap-2">
+              <button
+                onClick={() => setPreset('current')}
+                className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${isCurrent ? 'bg-primary text-primary-foreground' : 'bg-secondary text-muted-foreground hover:text-foreground'}`}
+              >
+                Bieżący miesiąc
+              </button>
+              <button
+                onClick={() => setPreset('last')}
+                className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${isLast ? 'bg-primary text-primary-foreground' : 'bg-secondary text-muted-foreground hover:text-foreground'}`}
+              >
+                Poprzedni miesiąc
+              </button>
+            </div>
+          </div>
+
+          {/* Zakres dat */}
+          <div className="space-y-1">
+            <p className="text-xs text-muted-foreground">Od</p>
+            <input
+              type="date"
+              value={dateFrom}
+              max={dateTo}
+              onChange={e => setDateFrom(e.target.value)}
+              className="px-3 py-1.5 rounded-lg border border-border bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/30"
+            />
+          </div>
+          <div className="space-y-1">
+            <p className="text-xs text-muted-foreground">Do</p>
+            <input
+              type="date"
+              value={dateTo}
+              min={dateFrom}
+              onChange={e => setDateTo(e.target.value)}
+              className="px-3 py-1.5 rounded-lg border border-border bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/30"
+            />
+          </div>
+
+          {/* Pracownik */}
+          <div className="space-y-1">
+            <p className="text-xs text-muted-foreground">Pracownik</p>
+            <select
+              value={selectedEmployee}
+              onChange={e => setSelectedEmployee(e.target.value)}
+              className="px-3 py-1.5 rounded-lg border border-border bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/30"
+            >
+              <option value="all">Wszyscy pracownicy</option>
+              {employees
+                .filter(e => (e.role || 'pracownik') !== 'salon')
+                .map(e => (
+                  <option key={e.id} value={e.id}>{e.name}</option>
+                ))}
+            </select>
+          </div>
         </div>
       </div>
 
@@ -95,7 +177,7 @@ const AdminReports = () => {
           { label: 'Wizyty', value: periodAppointments.length, icon: Scissors, color: 'text-primary' },
           { label: 'Przychód', value: `${revenue} zł`, icon: TrendingUp, color: 'text-green-600' },
           { label: 'Zaliczki', value: `${deposits} zł`, icon: CreditCard, color: 'text-accent' },
-          { label: 'Odkrycia tel.', value: phoneReveals.length, icon: Eye, color: 'text-destructive' },
+          { label: 'Odkrycia tel.', value: filteredReveals.length, icon: Eye, color: 'text-destructive' },
         ].map(s => (
           <div key={s.label} className="glass-card p-5">
             <div className="flex items-center gap-2 mb-2">
@@ -153,14 +235,14 @@ const AdminReports = () => {
       </div>
 
       {/* Log odkryć telefonów */}
-      {phoneReveals.length > 0 && (
+      {filteredReveals.length > 0 && (
         <div className="glass-card p-5">
           <h2 className="font-semibold mb-4 flex items-center gap-2">
             <Eye className="w-4 h-4 text-destructive" />
             Log odkryć numerów telefonu
           </h2>
           <div className="space-y-2">
-            {phoneReveals.slice(0, 20).map(r => (
+            {filteredReveals.slice(0, 20).map(r => (
               <div key={r.id} className="flex items-center justify-between p-3 rounded-lg bg-destructive/5 border border-destructive/10 text-sm">
                 <div>
                   <span className="font-medium">{r.employeeName}</span>

@@ -39,7 +39,7 @@ export const PLANS: PlanDefinition[] = [
     id: 'standard',
     name: 'Standard',
     price: 89,
-    features: ['dashboard','calendar','appointments','employees','clients','services'],
+    features: ['dashboard','calendar','appointments','employees','clients','services','gallery'],
   },
   {
     id: 'standard_plus',
@@ -47,7 +47,7 @@ export const PLANS: PlanDefinition[] = [
     price: 129,
     features: [
       'dashboard','calendar','appointments','employees','clients','services',
-      'messages','online_booking','deposits',
+      'messages','online_booking','deposits','gallery',
     ],
   },
   {
@@ -56,7 +56,7 @@ export const PLANS: PlanDefinition[] = [
     price: 149,
     features: [
       'dashboard','calendar','appointments','employees','clients','services',
-      'messages','online_booking','deposits','reports','phone_protection',
+      'messages','online_booking','deposits','reports','phone_protection','gallery',
     ],
   },
 ];

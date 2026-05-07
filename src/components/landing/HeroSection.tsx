@@ -1,6 +1,6 @@
 import { motion } from 'framer-motion';
 import { Button } from '@/components/ui/button';
-import heroImage from '@/assets/hero-salon.jpg';
+import heroImage from '@/assets/hero-salon.png';
 
 interface HeroProps {
   onBooking?: () => void;
@@ -48,13 +48,15 @@ export function HeroSection({ onBooking }: HeroProps) {
             Manicure, pedicure, rzęsy, brwi i wiele więcej.
           </p>
           <div className="flex flex-col sm:flex-row gap-4">
-            <Button
-              size="lg"
-              onClick={onBooking}
-              className="bg-primary text-primary-foreground hover:bg-primary/90 text-base px-8 py-6 font-semibold"
-            >
-              Umów wizytę
-            </Button>
+            {onBooking && (
+              <Button
+                size="lg"
+                onClick={onBooking}
+                className="bg-primary text-primary-foreground hover:bg-primary/90 text-base px-8 py-6 font-semibold"
+              >
+                Umów wizytę
+              </Button>
+            )}
             <Button
               size="lg"
               variant="outline"

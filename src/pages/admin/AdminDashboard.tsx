@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 import { Calendar, Clock, TrendingUp, Loader2, Database, AlertCircle, CheckCircle, X, MessageSquare, Send, Save } from 'lucide-react';
 import { useAppointments, useServices, useEmployees, useSettings } from '@/hooks/useFirestore';
+import { useAuth } from '@/contexts/AuthContext';
 import { format, addDays } from 'date-fns';
 import { pl } from 'date-fns/locale';
 import { Button } from '@/components/ui/button';
@@ -37,6 +38,8 @@ const depositLabels: Record<string, string> = {
 const DEFAULT_TEMPLATE = 'Przypomnienie: wizyta w salonie MajLi Beauty {data} o godz. {godzina} ({zabieg}, {pracownik}). Do zobaczenia!';
 
 const AdminDashboard = () => {
+  const { employee: currentEmployee } = useAuth();
+  const isAdmin = (currentEmployee?.role || 'pracownik') === 'admin';
   const { appointments, loading: loadingA, updateAppointment } = useAppointments();
   const { services, loading: loadingS } = useServices();
   const { employees, loading: loadingE } = useEmployees();
@@ -263,7 +266,7 @@ const AdminDashboard = () => {
       )}
 
       {/* Szablon przypomnienia SMS */}
-      <div className="glass-card p-5 space-y-3">
+      {isAdmin && <div className="glass-card p-5 space-y-3">
         <div className="flex items-center justify-between">
           <h2 className="font-semibold text-sm flex items-center gap-2">
             <MessageSquare className="w-4 h-4 text-blue-500" />
@@ -310,7 +313,7 @@ const AdminDashboard = () => {
             }
           </span>
         </p>
-      </div>
+      </div>}
 
       {/* Jutrzejsze wizyty */}
       <div className="glass-card p-6">

@@ -41,12 +41,14 @@ export function Navbar({ onBooking }: NavbarProps) {
               {link.label}
             </button>
           ))}
-          <Button
-            onClick={onBooking}
-            className="bg-primary text-primary-foreground hover:bg-primary/90 font-semibold"
-          >
-            Umów wizytę
-          </Button>
+          {onBooking && (
+            <Button
+              onClick={onBooking}
+              className="bg-primary text-primary-foreground hover:bg-primary/90 font-semibold"
+            >
+              Umów wizytę
+            </Button>
+          )}
         </div>
 
         {/* Mobile toggle */}
@@ -71,12 +73,14 @@ export function Navbar({ onBooking }: NavbarProps) {
               {link.label}
             </button>
           ))}
-          <Button
-            onClick={() => { setMobileOpen(false); onBooking?.(); }}
-            className="w-full bg-primary text-primary-foreground"
-          >
-            Umów wizytę
-          </Button>
+          {onBooking && (
+            <Button
+              onClick={() => { setMobileOpen(false); onBooking(); }}
+              className="w-full bg-primary text-primary-foreground"
+            >
+              Umów wizytę
+            </Button>
+          )}
           <a href="tel:+48782696143" className="flex items-center gap-2 text-muted-foreground text-sm py-1">
             <Phone size={14} /> +48 782 696 143
           </a>

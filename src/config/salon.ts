@@ -8,12 +8,12 @@ export const salonConfig = {
   salonId: 'majli-beauty-1777446801447',
 
   // ── Podstawowe info ──────────────────────────────────────────
-  name: 'Majli Beauty',
+  name: 'MajLi Beauty',
   tagline: 'Profesjonalna pielęgnacja urody',
-  phone: '+48 123 456 789',
-  email: 'kontakt@majlibeauty.pl',
-  address: 'ul. Przykładowa 1, Warszawa',
-  city: 'Warszawa',
+  phone: '+48 782 696 143',
+  email: '',
+  address: 'Bajdy 200, 38-471 Wojaszówka',
+  city: 'Wojaszówka',
 
   // ── Kolorystyka (HSL bez nawiasów) ───────────────────────────
   colors: {
@@ -28,8 +28,8 @@ export const salonConfig = {
 
   // ── Media społecznościowe ─────────────────────────────────────
   social: {
-    instagram: 'https://instagram.com/majlibeauty',
-    facebook: 'https://facebook.com/majlibeauty',
+    instagram: 'https://www.instagram.com/majli.beauty/',
+    facebook: 'https://www.facebook.com/majli.paznokcie',
   },
 
   // ── Firebase ─────────────────────────────────────────────────
@@ -50,7 +50,7 @@ export const salonConfig = {
   // ── Subskrypcja (do weryfikacji przez super-admina) ──────────
   subscription: {
     active: true,
-    plan: 'standard',           // 'trial' | 'standard' | 'pro'
+    plan: 'pro',
     expiresAt: '2026-12-31',
   },
 };

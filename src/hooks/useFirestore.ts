@@ -123,6 +123,8 @@ export function useSettings() {
   const [textBeeApiKey, setTextBeeApiKey] = useState<string>('');
   const [textBeeDeviceId, setTextBeeDeviceId] = useState<string>('');
   const [reminderTemplate, setReminderTemplate] = useState<string>('');
+  const [cloudinaryCloudName, setCloudinaryCloudName] = useState<string>('');
+  const [cloudinaryUploadPreset, setCloudinaryUploadPreset] = useState<string>('');
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -132,11 +134,15 @@ export function useSettings() {
         setTextBeeApiKey(snap.data().textBeeApiKey ?? '');
         setTextBeeDeviceId(snap.data().textBeeDeviceId ?? '');
         setReminderTemplate(snap.data().reminderTemplate ?? '');
+        setCloudinaryCloudName(snap.data().cloudinaryCloudName ?? '');
+        setCloudinaryUploadPreset(snap.data().cloudinaryUploadPreset ?? '');
       } else {
         setDepositAmount(0);
         setTextBeeApiKey('');
         setTextBeeDeviceId('');
         setReminderTemplate('');
+        setCloudinaryCloudName('');
+        setCloudinaryUploadPreset('');
       }
       setLoading(false);
     }, () => setLoading(false));
@@ -161,5 +167,11 @@ export function useSettings() {
     );
   };
 
-  return { depositAmount, textBeeApiKey, textBeeDeviceId, reminderTemplate, loading, saveDepositAmount, saveTextBee, saveReminderTemplate };
+  const saveCloudinary = async (cloudName: string, uploadPreset: string) => {
+    await import('firebase/firestore').then(({ setDoc }) =>
+      setDoc(doc(db, 'settings', 'global'), { cloudinaryCloudName: cloudName, cloudinaryUploadPreset: uploadPreset }, { merge: true })
+    );
+  };
+
+  return { depositAmount, textBeeApiKey, textBeeDeviceId, reminderTemplate, cloudinaryCloudName, cloudinaryUploadPreset, loading, saveDepositAmount, saveTextBee, saveReminderTemplate, saveCloudinary };
 }

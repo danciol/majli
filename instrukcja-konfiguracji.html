@@ -1,0 +1,385 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Instrukcja konfiguracji — Panel Salonu</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Playfair+Display:wght@700&display=swap');
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: 'Inter', sans-serif;
+    font-size: 13px;
+    line-height: 1.65;
+    color: #1a1a1a;
+    background: #fff;
+    padding: 48px;
+    max-width: 820px;
+    margin: 0 auto;
+  }
+
+  /* ── Header ── */
+  .cover {
+    text-align: center;
+    padding: 48px 0 40px;
+    border-bottom: 2px solid #2d6a4f;
+    margin-bottom: 40px;
+  }
+  .cover-logo {
+    font-family: 'Playfair Display', serif;
+    font-size: 32px;
+    color: #2d6a4f;
+    margin-bottom: 6px;
+  }
+  .cover-sub {
+    font-size: 13px;
+    color: #666;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+  }
+  .cover-title {
+    font-size: 22px;
+    font-weight: 700;
+    margin-top: 20px;
+    color: #111;
+  }
+  .cover-desc {
+    font-size: 13px;
+    color: #555;
+    margin-top: 6px;
+    max-width: 500px;
+    margin-left: auto;
+    margin-right: auto;
+  }
+
+  /* ── TOC ── */
+  .toc {
+    background: #f6faf8;
+    border: 1px solid #c8e6c9;
+    border-radius: 10px;
+    padding: 22px 28px;
+    margin-bottom: 36px;
+  }
+  .toc h3 {
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 2px;
+    color: #2d6a4f;
+    margin-bottom: 12px;
+  }
+  .toc ol {
+    padding-left: 20px;
+    color: #333;
+  }
+  .toc li { margin-bottom: 4px; }
+  .toc .optional { color: #999; font-size: 12px; }
+
+  /* ── Section ── */
+  .section {
+    margin-bottom: 40px;
+    page-break-inside: avoid;
+  }
+  .section-header {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 18px;
+    padding-bottom: 10px;
+    border-bottom: 1px solid #e8e8e8;
+  }
+  .section-num {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    background: #2d6a4f;
+    color: #fff;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 700;
+    font-size: 14px;
+    flex-shrink: 0;
+  }
+  .section-num.optional { background: #aaa; }
+  .section-title {
+    font-size: 17px;
+    font-weight: 700;
+    color: #111;
+  }
+  .section-badge {
+    margin-left: auto;
+    font-size: 10px;
+    font-weight: 600;
+    padding: 3px 10px;
+    border-radius: 20px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+  }
+  .badge-free { background: #dcfce7; color: #166534; }
+  .badge-optional { background: #f3f4f6; color: #666; }
+  .badge-required { background: #fef3c7; color: #92400e; }
+
+  /* ── Steps ── */
+  .steps { counter-reset: step; }
+  .step {
+    display: flex;
+    gap: 12px;
+    margin-bottom: 14px;
+    align-items: flex-start;
+  }
+  .step-num {
+    counter-increment: step;
+    content: counter(step);
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    background: #e8f5e9;
+    color: #2d6a4f;
+    font-weight: 700;
+    font-size: 11px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    margin-top: 1px;
+  }
+  .step-body { flex: 1; }
+  .step-body strong { color: #111; }
+
+  /* ── Info boxes ── */
+  .box {
+    border-radius: 8px;
+    padding: 14px 16px;
+    margin: 14px 0;
+    font-size: 12.5px;
+  }
+  .box-tip { background: #f0fdf4; border-left: 3px solid #22c55e; }
+  .box-warn { background: #fffbeb; border-left: 3px solid #f59e0b; }
+  .box-info { background: #eff6ff; border-left: 3px solid #3b82f6; }
+  .box-title { font-weight: 700; margin-bottom: 3px; font-size: 11px; text-transform: uppercase; letter-spacing: 1px; color: #555; }
+
+  /* ── Code ── */
+  code {
+    background: #f4f4f4;
+    border: 1px solid #e0e0e0;
+    border-radius: 4px;
+    padding: 1px 6px;
+    font-family: 'Courier New', monospace;
+    font-size: 12px;
+    color: #c0392b;
+  }
+
+  /* ── Config table ── */
+  .config-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 14px 0;
+    font-size: 12.5px;
+  }
+  .config-table th {
+    background: #f6faf8;
+    border: 1px solid #d1e7dd;
+    padding: 8px 12px;
+    text-align: left;
+    font-weight: 600;
+    color: #2d6a4f;
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+  }
+  .config-table td {
+    border: 1px solid #e8e8e8;
+    padding: 8px 12px;
+    vertical-align: top;
+  }
+  .config-table tr:nth-child(even) td { background: #fafafa; }
+  .config-table .field { font-family: 'Courier New', monospace; font-size: 12px; color: #c0392b; }
+  .config-table .desc { color: #555; }
+
+  /* ── Summary ── */
+  .summary {
+    background: #f6faf8;
+    border: 1px solid #c8e6c9;
+    border-radius: 10px;
+    padding: 22px 28px;
+    margin-top: 40px;
+    page-break-inside: avoid;
+  }
+  .summary h3 {
+    font-size: 14px;
+    font-weight: 700;
+    margin-bottom: 14px;
+    color: #2d6a4f;
+  }
+  .summary-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 0;
+    border-bottom: 1px solid #e0efe5;
+    font-size: 13px;
+  }
+  .summary-row:last-child { border-bottom: none; }
+  .check { font-size: 15px; }
+
+  /* ── Footer ── */
+  .footer {
+    text-align: center;
+    margin-top: 36px;
+    padding-top: 20px;
+    border-top: 1px solid #e8e8e8;
+    color: #aaa;
+    font-size: 11px;
+  }
+
+  @media print {
+    body { padding: 24px; font-size: 12px; }
+    .section { page-break-inside: avoid; }
+    .toc { page-break-after: avoid; }
+  }
+</style>
+</head>
+<body>
+
+<!-- Cover -->
+<div class="cover">
+  <div class="cover-logo">Panel Salonu</div>
+  <div class="cover-sub">Dokumentacja wdrożeniowa</div>
+  <div class="cover-title">Instrukcja konfiguracji serwisów zewnętrznych</div>
+  <div class="cover-desc">Krok po kroku jak uruchomić wszystkie niezbędne usługi przed pierwszym uruchomieniem aplikacji.</div>
+</div>
+
+<!-- TOC -->
+<div class="toc">
+  <h3>Spis treści</h3>
+  <ol>
+    <li>Firebase — baza danych i logowanie <span class="badge-required" style="font-size:10px;padding:1px 7px;border-radius:10px;background:#fef3c7;color:#92400e;">wymagane</span></li>
+    <li>Cloudinary — galeria zdjęć <span class="badge-free" style="font-size:10px;padding:1px 7px;border-radius:10px;background:#dcfce7;color:#166534;">darmowe</span></li>
+    <li>TextBee — wysyłanie SMS <span class="badge-free" style="font-size:10px;padding:1px 7px;border-radius:10px;background:#dcfce7;color:#166534;">darmowe</span></li>
+  </ol>
+</div>
+
+
+<!-- ═══ 1. FIREBASE ═══ -->
+<div class="section">
+  <div class="section-header">
+    <div class="section-num">1</div>
+    <div class="section-title">Firebase</div>
+    <span class="section-badge badge-required">Wymagane</span>
+  </div>
+
+  <p style="margin-bottom:14px;color:#444;">Firebase to baza danych i system logowania aplikacji. Bez niego nic nie działa.</p>
+
+  <div class="steps">
+    <div class="step"><div class="step-num">1</div><div class="step-body">Wejdź na <strong>console.firebase.google.com</strong> i zaloguj się kontem Google.</div></div>
+    <div class="step"><div class="step-num">2</div><div class="step-body">Kliknij <strong>Utwórz projekt</strong> → wpisz nazwę (np. <em>nazwa-salonu</em>) → wyłącz Google Analytics → kliknij <strong>Utwórz projekt</strong>.</div></div>
+    <div class="step"><div class="step-num">3</div><div class="step-body"><strong>Dodaj aplikację webową:</strong> w projekcie kliknij ikonę <code>&lt;/&gt;</code> → wpisz nazwę aplikacji → kliknij <strong>Zarejestruj</strong>. Skopiuj obiekt <code>firebaseConfig</code> — będzie potrzebny w kroku 5.</div></div>
+    <div class="step"><div class="step-num">4</div><div class="step-body"><strong>Włącz Firestore:</strong> w lewym menu → <strong>Build → Firestore Database</strong> → <strong>Create database</strong> → wybierz <em>production mode</em> → wybierz region (np. <em>europe-west1</em>) → kliknij <strong>Done</strong>.</div></div>
+    <div class="step"><div class="step-num">5</div><div class="step-body"><strong>Ustaw reguły Firestore:</strong> zakładka <strong>Rules</strong> → wklej poniższe reguły → kliknij <strong>Publish</strong>.</div></div>
+  </div>
+
+  <div class="box box-info" style="font-family:'Courier New',monospace;font-size:11.5px;white-space:pre;">rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /settings/{doc} {
+      allow read: if true;
+      allow write: if request.auth != null;
+    }
+    match /gallery/{doc} {
+      allow read: if true;
+      allow write: if request.auth != null;
+    }
+    match /{document=**} {
+      allow read, write: if request.auth != null;
+    }
+  }
+}</div>
+
+  <div class="steps">
+    <div class="step"><div class="step-num">6</div><div class="step-body"><strong>Włącz Authentication:</strong> w lewym menu → <strong>Build → Authentication</strong> → <strong>Get started</strong> → zakładka <strong>Sign-in method</strong> → włącz <strong>Email/Password</strong> → Save.</div></div>
+    <div class="step"><div class="step-num">7</div><div class="step-body"><strong>Dodaj pierwsze konto admina:</strong> zakładka <strong>Users</strong> → <strong>Add user</strong> → wpisz email i hasło → <strong>Add user</strong>.</div></div>
+    <div class="step"><div class="step-num">8</div><div class="step-body"><strong>Dodaj pracownika do Firestore:</strong> w Firestore → <strong>Start collection</strong> → ID kolekcji: <code>employees</code> → ID dokumentu: <em>(auto)</em> → dodaj pola: <code>name</code> (string), <code>email</code> (string, ten sam co w Auth), <code>role</code> (string: <code>admin</code>).</div></div>
+  </div>
+
+  <div class="box box-tip">
+    <div class="box-title">Darmowy plan (Spark)</div>
+    Firestore daje 1 GB miejsca, 50 000 odczytów i 20 000 zapisów dziennie — dla salonu wystarczy na lata bez płacenia.
+  </div>
+</div>
+
+
+<!-- ═══ 3. CLOUDINARY ═══ -->
+<div class="section">
+  <div class="section-header">
+    <div class="section-num">3</div>
+    <div class="section-title">Cloudinary — galeria zdjęć</div>
+    <span class="section-badge badge-free">Darmowe</span>
+  </div>
+
+  <p style="margin-bottom:14px;color:#444;">Cloudinary przechowuje zdjęcia w galerii. Wgrywasz przez panel admina — pojawiają się od razu na stronie.</p>
+
+  <div class="steps">
+    <div class="step"><div class="step-num">1</div><div class="step-body">Wejdź na <strong>cloudinary.com</strong> → <strong>Sign Up Free</strong> → zarejestruj się (można przez Google).</div></div>
+    <div class="step"><div class="step-num">2</div><div class="step-body">Po zalogowaniu w dashboardzie znajdź i skopiuj swój <strong>Cloud Name</strong> (np. <code>dxyz1234abc</code>).</div></div>
+    <div class="step"><div class="step-num">3</div><div class="step-body">Przejdź do <strong>Settings → Upload → Upload presets → Add upload preset</strong>.</div></div>
+    <div class="step"><div class="step-num">4</div><div class="step-body">Ustaw: <strong>Preset name</strong> = <code>gallery_unsigned</code>, <strong>Signing Mode</strong> = <strong>Unsigned</strong>, opcjonalnie <strong>Folder</strong> = nazwa salonu. Zapisz.</div></div>
+    <div class="step"><div class="step-num">5</div><div class="step-body">W panelu admina → <strong>Ustawienia → Cloudinary</strong> → wpisz <strong>Cloud Name</strong> i <strong>Upload Preset</strong> → kliknij <strong>Zapisz</strong>.</div></div>
+  </div>
+
+  <div class="box box-tip">
+    <div class="box-title">Limity darmowego konta</div>
+    25 GB miejsca + 25 GB transferu miesięcznie. Wystarczy na setki zdjęć salonu bez żadnych opłat.
+  </div>
+</div>
+
+
+<!-- ═══ 4. TEXTBEE ═══ -->
+<div class="section">
+  <div class="section-header">
+    <div class="section-num">4</div>
+    <div class="section-title">TextBee — wysyłanie SMS</div>
+    <span class="section-badge badge-free">Darmowe</span>
+  </div>
+
+  <p style="margin-bottom:14px;color:#444;">TextBee używa Twojego telefonu z Androidem jako bramki SMS. Wiadomości idą z Twojego numeru telefonu.</p>
+
+  <div class="box box-warn">
+    <div class="box-title">Wymagania</div>
+    Potrzebujesz telefonu z <strong>Androidem</strong> (stary/zapasowy wystarczy), który będzie cały czas podłączony do prądu i internetu.
+  </div>
+
+  <div class="steps">
+    <div class="step"><div class="step-num">1</div><div class="step-body">Wejdź na <strong>textbee.dev</strong> → zarejestruj konto.</div></div>
+    <div class="step"><div class="step-num">2</div><div class="step-body">Na telefonie z Androidem pobierz aplikację <strong>TextBee</strong> z Google Play.</div></div>
+    <div class="step"><div class="step-num">3</div><div class="step-body">Zaloguj się w aplikacji na telefonie tym samym kontem co na stronie.</div></div>
+    <div class="step"><div class="step-num">4</div><div class="step-body">W panelu na <strong>textbee.dev → Devices</strong> skopiuj <strong>Device ID</strong> swojego telefonu.</div></div>
+    <div class="step"><div class="step-num">5</div><div class="step-body">W <strong>textbee.dev → API Keys</strong> wygeneruj nowy klucz i skopiuj go.</div></div>
+    <div class="step"><div class="step-num">6</div><div class="step-body">W panelu admina → <strong>Ustawienia → TextBee SMS</strong> → wpisz <strong>API Key</strong> i <strong>Device ID</strong> → kliknij <strong>Zapisz</strong>.</div></div>
+  </div>
+
+  <div class="box box-info">
+    <div class="box-title">Bez konfiguracji TextBee</div>
+    Jeśli TextBee nie jest skonfigurowany, kliknięcie „Wyślij przypomnienie" otwiera aplikację SMS w telefonie z gotową wiadomością — możesz wysłać ręcznie.
+  </div>
+</div>
+
+
+<!-- Summary -->
+<div class="summary">
+  <h3>Checklista przed uruchomieniem</h3>
+  <div class="summary-row"><span class="check">☐</span> Firebase — projekt utworzony, Firestore i Auth włączone, reguły ustawione</div>
+  <div class="summary-row"><span class="check">☐</span> Firebase — pierwsze konto admina dodane w Authentication i Firestore</div>
+  <div class="summary-row"><span class="check">☐</span> Cloudinary — konto założone, Upload Preset (unsigned) utworzony</div>
+  <div class="summary-row"><span class="check">☐</span> Cloudinary — dane wpisane w panelu admina → Ustawienia</div>
+  <div class="summary-row"><span class="check">☐</span> TextBee — konto założone, aplikacja na Androidzie zainstalowana (opcjonalnie)</div>
+  <div class="summary-row"><span class="check">☐</span> TextBee — API Key i Device ID wpisane w panelu admina → Ustawienia (opcjonalnie)</div>
+</div>
+
+<div class="footer">
+  Panel Salonu &nbsp;·&nbsp; Dokumentacja wdrożeniowa &nbsp;·&nbsp; Wersja 1.0
+</div>
+
+</body>
+</html>

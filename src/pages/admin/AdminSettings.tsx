@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Settings, CreditCard, Loader2, Save, MessageSquare, ExternalLink } from 'lucide-react';
+import { Settings, CreditCard, Loader2, Save, MessageSquare, ExternalLink, Images } from 'lucide-react';
 import { useSettings } from '@/hooks/useFirestore';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -7,20 +7,25 @@ import { Label } from '@/components/ui/label';
 import { toast } from 'sonner';
 
 const AdminSettings = () => {
-  const { depositAmount, textBeeApiKey, textBeeDeviceId, loading, saveDepositAmount, saveTextBee } = useSettings();
+  const { depositAmount, textBeeApiKey, textBeeDeviceId, cloudinaryCloudName, cloudinaryUploadPreset, loading, saveDepositAmount, saveTextBee, saveCloudinary } = useSettings();
   const [depositValue, setDepositValue] = useState('');
   const [tbApiKey, setTbApiKey] = useState('');
   const [tbDeviceId, setTbDeviceId] = useState('');
+  const [cloudName, setCloudName] = useState('');
+  const [uploadPreset, setUploadPreset] = useState('');
   const [savingTextBee, setSavingTextBee] = useState(false);
   const [savingDeposit, setSavingDeposit] = useState(false);
+  const [savingCloudinary, setSavingCloudinary] = useState(false);
 
   useEffect(() => {
     if (!loading) {
       setDepositValue(depositAmount > 0 ? String(depositAmount) : '');
       setTbApiKey(textBeeApiKey || '');
       setTbDeviceId(textBeeDeviceId || '');
+      setCloudName(cloudinaryCloudName || '');
+      setUploadPreset(cloudinaryUploadPreset || '');
     }
-  }, [depositAmount, textBeeApiKey, textBeeDeviceId, loading]);
+  }, [depositAmount, textBeeApiKey, textBeeDeviceId, cloudinaryCloudName, cloudinaryUploadPreset, loading]);
 
   const handleSaveDeposit = async () => {
     const amount = Number(depositValue);
@@ -84,6 +89,35 @@ const AdminSettings = () => {
           <div className="p-3 rounded-lg bg-primary/5 border border-primary/20 text-sm">✅ TextBee skonfigurowany</div>
         ) : (
           <div className="p-3 rounded-lg bg-secondary/50 border border-border text-sm text-muted-foreground">ℹ️ Brak konfiguracji — SMS-y będą otwierać aplikację telefonu</div>
+        )}
+      </div>
+
+      <div className="glass-card p-6 space-y-5">
+        <div className="flex items-center gap-2"><Images className="w-5 h-5 text-primary" /><h2 className="font-semibold">Cloudinary — galeria zdjęć</h2></div>
+        <p className="text-xs text-muted-foreground">
+          Wpisz dane z konta <a href="https://cloudinary.com" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline inline-flex items-center gap-0.5">cloudinary.com <ExternalLink className="w-3 h-3" /></a> żeby wgrywać zdjęcia do galerii.
+        </p>
+        <div className="space-y-3">
+          <div className="space-y-1.5">
+            <Label>Cloud Name</Label>
+            <Input value={cloudName} onChange={e => setCloudName(e.target.value)} placeholder="np. mycloud123" className="font-mono text-xs" />
+          </div>
+          <div className="space-y-1.5">
+            <Label>Upload Preset (unsigned)</Label>
+            <Input value={uploadPreset} onChange={e => setUploadPreset(e.target.value)} placeholder="np. gallery_unsigned" className="font-mono text-xs" />
+          </div>
+          <Button onClick={async () => {
+            setSavingCloudinary(true);
+            try { await saveCloudinary(cloudName.trim(), uploadPreset.trim()); toast.success('Cloudinary zapisany'); }
+            catch { toast.error('Błąd zapisu'); } finally { setSavingCloudinary(false); }
+          }} disabled={savingCloudinary} className="gap-2">
+            {savingCloudinary ? <><Loader2 className="w-4 h-4 animate-spin" />Zapisuję...</> : <><Save className="w-4 h-4" />Zapisz</>}
+          </Button>
+        </div>
+        {cloudinaryCloudName && cloudinaryUploadPreset ? (
+          <div className="p-3 rounded-lg bg-primary/5 border border-primary/20 text-sm">✅ Cloudinary skonfigurowany: <strong>{cloudinaryCloudName}</strong></div>
+        ) : (
+          <div className="p-3 rounded-lg bg-secondary/50 border border-border text-sm text-muted-foreground">ℹ️ Brak konfiguracji — galeria nie będzie działać</div>
         )}
       </div>
     </div>

@@ -1,20 +1,21 @@
 import { useState, useEffect, useRef } from 'react';
-import { Images, Upload, Trash2, Loader2, X } from 'lucide-react';
+import { Images, Upload, Trash2, Loader2, X, AlertCircle } from 'lucide-react';
 import { collection, addDoc, onSnapshot, deleteDoc, doc, orderBy, query } from 'firebase/firestore';
-import { ref, uploadBytesResumable, getDownloadURL, deleteObject } from 'firebase/storage';
-import { db, storage } from '@/lib/firebase';
+import { db } from '@/lib/firebase';
+import { useSettings } from '@/hooks/useFirestore';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
 
 interface GalleryImage {
   id: string;
   url: string;
-  storagePath: string;
+  publicId: string;
   name: string;
   createdAt: string;
 }
 
 const AdminGallery = () => {
+  const { cloudinaryCloudName, cloudinaryUploadPreset, loading: settingsLoading } = useSettings();
   const [images, setImages] = useState<GalleryImage[]>([]);
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
@@ -32,25 +33,39 @@ const AdminGallery = () => {
     return unsub;
   }, []);
 
-  const uploadFile = (file: File): Promise<{ url: string; storagePath: string }> => {
+  const uploadToCloudinary = (file: File): Promise<{ url: string; publicId: string }> => {
     return new Promise((resolve, reject) => {
-      const path = `gallery/${Date.now()}_${file.name}`;
-      const storageRef = ref(storage, path);
-      const task = uploadBytesResumable(storageRef, file);
+      const formData = new FormData();
+      formData.append('file', file);
+      formData.append('upload_preset', cloudinaryUploadPreset);
 
-      task.on('state_changed',
-        snap => setUploadProgress(Math.round(snap.bytesTransferred / snap.totalBytes * 100)),
-        err => reject(err),
-        async () => {
-          const url = await getDownloadURL(task.snapshot.ref);
-          resolve({ url, storagePath: path });
+      const xhr = new XMLHttpRequest();
+      xhr.open('POST', `https://api.cloudinary.com/v1_1/${cloudinaryCloudName}/image/upload`);
+
+      xhr.upload.onprogress = (e) => {
+        if (e.lengthComputable) setUploadProgress(Math.round(e.loaded / e.total * 100));
+      };
+
+      xhr.onload = () => {
+        if (xhr.status === 200) {
+          const res = JSON.parse(xhr.responseText);
+          resolve({ url: res.secure_url, publicId: res.public_id });
+        } else {
+          reject(new Error(`Upload failed: ${xhr.status}`));
         }
-      );
+      };
+
+      xhr.onerror = () => reject(new Error('Network error'));
+      xhr.send(formData);
     });
   };
 
   const handleUpload = async (files: FileList | null) => {
     if (!files || files.length === 0) return;
+    if (!cloudinaryCloudName || !cloudinaryUploadPreset) {
+      toast.error('Skonfiguruj Cloudinary w Ustawieniach');
+      return;
+    }
     setUploading(true);
 
     for (const file of Array.from(files)) {
@@ -58,9 +73,9 @@ const AdminGallery = () => {
       if (file.size > 15 * 1024 * 1024) { toast.error(`${file.name} — za duże (max 15 MB)`); continue; }
       setUploadProgress(0);
       try {
-        const { url, storagePath } = await uploadFile(file);
+        const { url, publicId } = await uploadToCloudinary(file);
         await addDoc(collection(db, 'gallery'), {
-          url, storagePath, name: file.name, createdAt: new Date().toISOString(),
+          url, publicId, name: file.name, createdAt: new Date().toISOString(),
         });
         toast.success(`${file.name} — wgrano`);
       } catch {
@@ -76,9 +91,6 @@ const AdminGallery = () => {
   const handleDelete = async (image: GalleryImage) => {
     setDeletingId(image.id);
     try {
-      if (image.storagePath) {
-        await deleteObject(ref(storage, image.storagePath));
-      }
       await deleteDoc(doc(db, 'gallery', image.id));
       toast.success('Zdjęcie usunięte');
     } catch {
@@ -87,6 +99,8 @@ const AdminGallery = () => {
       setDeletingId(null);
     }
   };
+
+  const isConfigured = cloudinaryCloudName && cloudinaryUploadPreset;
 
   return (
     <div className="space-y-6">
@@ -102,7 +116,7 @@ const AdminGallery = () => {
         </div>
         <div>
           <input ref={fileRef} type="file" accept="image/*" multiple className="hidden" onChange={e => handleUpload(e.target.files)} />
-          <Button onClick={() => fileRef.current?.click()} disabled={uploading} className="gap-2">
+          <Button onClick={() => fileRef.current?.click()} disabled={uploading || !isConfigured} className="gap-2">
             {uploading
               ? <><Loader2 className="w-4 h-4 animate-spin" />Wgrywanie {uploadProgress}%</>
               : <><Upload className="w-4 h-4" />Dodaj zdjęcia</>}
@@ -110,16 +124,28 @@ const AdminGallery = () => {
         </div>
       </div>
 
-      <div
-        onDragOver={e => e.preventDefault()}
-        onDrop={e => { e.preventDefault(); handleUpload(e.dataTransfer.files); }}
-        onClick={() => !uploading && fileRef.current?.click()}
-        className="border-2 border-dashed border-border rounded-xl p-8 text-center cursor-pointer hover:border-primary/50 hover:bg-primary/5 transition-colors"
-      >
-        <Upload className="w-8 h-8 text-muted-foreground mx-auto mb-2" />
-        <p className="text-sm font-medium text-muted-foreground">Przeciągnij zdjęcia tutaj lub kliknij żeby wybrać</p>
-        <p className="text-xs text-muted-foreground/60 mt-1">JPG, PNG, WEBP — max 15 MB per zdjęcie</p>
-      </div>
+      {!settingsLoading && !isConfigured && (
+        <div className="p-4 rounded-xl border border-amber-200 bg-amber-50 dark:bg-amber-950/20 dark:border-amber-800 flex items-start gap-3">
+          <AlertCircle className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
+          <div>
+            <p className="text-sm font-medium text-amber-800 dark:text-amber-400">Cloudinary nie jest skonfigurowany</p>
+            <p className="text-xs text-amber-600 dark:text-amber-500 mt-0.5">Przejdź do <strong>Ustawienia</strong> i wpisz Cloud Name oraz Upload Preset.</p>
+          </div>
+        </div>
+      )}
+
+      {isConfigured && (
+        <div
+          onDragOver={e => e.preventDefault()}
+          onDrop={e => { e.preventDefault(); handleUpload(e.dataTransfer.files); }}
+          onClick={() => !uploading && fileRef.current?.click()}
+          className="border-2 border-dashed border-border rounded-xl p-8 text-center cursor-pointer hover:border-primary/50 hover:bg-primary/5 transition-colors"
+        >
+          <Upload className="w-8 h-8 text-muted-foreground mx-auto mb-2" />
+          <p className="text-sm font-medium text-muted-foreground">Przeciągnij zdjęcia tutaj lub kliknij żeby wybrać</p>
+          <p className="text-xs text-muted-foreground/60 mt-1">JPG, PNG, WEBP — max 15 MB per zdjęcie</p>
+        </div>
+      )}
 
       {uploading && (
         <div className="w-full bg-border rounded-full h-2">

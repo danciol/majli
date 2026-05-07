@@ -21,6 +21,7 @@ import AdminMessages from "./pages/admin/AdminMessages";
 import AdminSettings from "./pages/admin/AdminSettings";
 import AdminGallery from "./pages/admin/AdminGallery";
 import AdminReports from "./pages/admin/AdminReports";
+import PrivacyPolicy from "./pages/PrivacyPolicy";
 import { AdminLayout } from "./components/admin/AdminLayout";
 
 const queryClient = new QueryClient();
@@ -43,6 +44,7 @@ const App = () => {
             <BrowserRouter>
               <Routes>
                 <Route path="/" element={<Index />} />
+                <Route path="/polityka-prywatnosci" element={<PrivacyPolicy />} />
                 <Route path="/admin/login" element={<AdminLogin />} />
                 <Route path="/admin" element={<AdminLayout />}>
                   <Route index element={<AdminDashboard />} />

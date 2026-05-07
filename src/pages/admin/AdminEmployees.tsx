@@ -260,7 +260,7 @@ const AdminEmployees = () => {
                 <Label className="mb-2 block">Widoczność kalendarzy</Label>
                 <p className="text-xs text-muted-foreground mb-2">Wybierz których pracowników kalendarze może przeglądać</p>
                 <div className="space-y-2">
-                  {employees.filter(e => e.id !== editing?.id).map(emp => (
+                  {employees.filter(e => e.id !== editing?.id && (e.role || 'pracownik') !== 'salon').map(emp => (
                     <label key={emp.id} className="flex items-center gap-2 text-sm cursor-pointer">
                       <Checkbox
                         checked={form.canViewCalendars.includes(emp.id)}
