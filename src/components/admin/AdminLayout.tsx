@@ -61,12 +61,12 @@ export function AdminLayout() {
 
   return (
     <div className="min-h-screen flex bg-secondary/30">
-      <aside className={`fixed inset-y-0 left-0 z-50 w-64 bg-card border-r border-border transform transition-transform md:relative md:translate-x-0 ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'}`}>
-        <div className="flex items-center justify-between p-5 border-b border-border">
+      <aside className={`fixed inset-y-0 left-0 z-50 w-64 bg-card border-r border-border transform transition-transform md:relative md:translate-x-0 flex flex-col ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'}`}>
+        <div className="flex items-center justify-between p-5 border-b border-border shrink-0">
           <Link to="/" className="font-heading text-xl font-bold text-primary">Majli Beauty</Link>
           <button className="md:hidden" onClick={() => setSidebarOpen(false)}><X className="w-5 h-5" /></button>
         </div>
-        <nav className="p-3 space-y-1">
+        <nav className="flex-1 overflow-y-auto p-3 space-y-1">
           {visibleLinks.map((link) => {
             const active = location.pathname === link.to;
             const isWizyty = link.to === '/admin/wizyty';
@@ -90,7 +90,7 @@ export function AdminLayout() {
             );
           })}
         </nav>
-        <div className="absolute bottom-0 left-0 right-0 p-3 border-t border-border">
+        <div className="shrink-0 p-3 border-t border-border">
           <div className="px-4 py-2 mb-2">
             <p className="text-xs text-muted-foreground">Zalogowano jako</p>
             <p className="text-sm font-medium text-foreground truncate">{employee?.name}</p>
