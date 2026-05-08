@@ -54,7 +54,7 @@ export function StepWaitingList({ service, employee, date, onBack, onClose }: Pr
         </div>
         <h3 className="font-heading text-lg font-semibold mb-2">Zapisano!</h3>
         <p className="text-sm text-muted-foreground mb-6 leading-relaxed">
-          Gdy zwolni się termin, salon skontaktuje się z Tobą przez SMS.
+          Gdy zwolni się termin skontaktujemy się z Tobą.
         </p>
         <Button onClick={onClose} className="w-full bg-primary text-primary-foreground">
           Zamknij
