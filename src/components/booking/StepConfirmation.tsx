@@ -10,9 +10,10 @@ import { db } from '@/lib/firebase';
 interface Props {
   booking: BookingData;
   onClose: () => void;
+  closeLabel?: string;
 }
 
-export function StepConfirmation({ booking, onClose }: Props) {
+export function StepConfirmation({ booking, onClose, closeLabel }: Props) {
   const { addAppointment } = useAppointments();
   const { addClient } = useClients();
   const [saving, setSaving] = useState(false);
@@ -133,7 +134,7 @@ export function StepConfirmation({ booking, onClose }: Props) {
             ⏳ <strong>Co dalej?</strong> Salon skontaktuje się z Tobą, aby potwierdzić wizytę. Prosimy o cierpliwość.
           </div>
           <Button onClick={onClose} className="w-full bg-primary text-primary-foreground font-semibold">
-            Zamknij
+            {closeLabel ?? 'Zamknij'}
           </Button>
         </div>
       ) : (

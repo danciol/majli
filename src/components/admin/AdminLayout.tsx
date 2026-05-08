@@ -1,11 +1,11 @@
 import { Outlet, Link, useLocation, useNavigate, Navigate } from 'react-router-dom';
 import {
   LayoutDashboard, Calendar, Scissors, Users, ClipboardList,
-  LogOut, Menu, X, UserCheck, MessageSquare, Settings, Images, TrendingUp,
+  LogOut, Menu, X, UserCheck, MessageSquare, Settings, Images, TrendingUp, Clock,
 } from 'lucide-react';
 import { useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
-import { useAppointments } from '@/hooks/useFirestore';
+import { useAppointments, useWaitingList } from '@/hooks/useFirestore';
 import { usePlan } from '@/hooks/usePlan';
 import type { FeatureKey } from '@/config/plans';
 
@@ -25,6 +25,7 @@ const allLinks: NavLink[] = [
   { to: '/admin/pracownicy',   label: 'Pracownicy',  icon: Users,           roles: ['admin'],             feature: 'employees' },
   { to: '/admin/uslugi',       label: 'Usługi',      icon: Scissors,        roles: ['admin'],             feature: 'services' },
   { to: '/admin/wiadomosci',   label: 'Wiadomości',  icon: MessageSquare,   roles: ['admin'],             feature: 'messages' },
+  { to: '/admin/oczekujacy',   label: 'Oczekujący',  icon: Clock,           roles: ['admin'],             feature: 'online_booking' },
   { to: '/admin/galeria',      label: 'Galeria',     icon: Images,          roles: ['admin'],             feature: 'gallery' },
   { to: '/admin/raporty',      label: 'Raporty',     icon: TrendingUp,      roles: ['admin'],             feature: 'reports' },
   { to: '/admin/ustawienia',   label: 'Ustawienia',  icon: Settings,        roles: ['admin'] },
@@ -35,7 +36,9 @@ export function AdminLayout() {
   const navigate = useNavigate();
   const { isAuthenticated, employee, logout, loading } = useAuth();
   const { appointments } = useAppointments();
+  const { waitingList } = useWaitingList();
   const { can } = usePlan();
+  const pendingWaiting = waitingList.filter(e => !e.notified).length;
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
   if (loading) return (
@@ -76,6 +79,11 @@ export function AdminLayout() {
                 {isWizyty && pendingCount > 0 && (
                   <span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-destructive text-destructive-foreground text-[10px] font-bold">
                     {pendingCount > 9 ? '9+' : pendingCount}
+                  </span>
+                )}
+                {link.to === '/admin/oczekujacy' && pendingWaiting > 0 && (
+                  <span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-primary text-primary-foreground text-[10px] font-bold">
+                    {pendingWaiting > 9 ? '9+' : pendingWaiting}
                   </span>
                 )}
               </Link>

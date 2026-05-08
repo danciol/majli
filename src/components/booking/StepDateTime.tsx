@@ -1,7 +1,7 @@
 import { useState, useMemo } from 'react';
 import { format, addDays, startOfDay, isSameDay, setHours, setMinutes, isAfter } from 'date-fns';
 import { pl } from 'date-fns/locale';
-import { ChevronLeft, ChevronRight as ChevronRightIcon } from 'lucide-react';
+import { ChevronLeft, ChevronRight as ChevronRightIcon, Clock } from 'lucide-react';
 import { Employee, Appointment } from '@/data/services';
 import { Button } from '@/components/ui/button';
 
@@ -13,6 +13,7 @@ interface Props {
   selectedTime: string | null;
   onSelect: (date: Date, time: string) => void;
   onBack: () => void;
+  onWaitingList?: (date: Date) => void;
 }
 
 const dayKeys: Record<number, string[]> = {
@@ -78,7 +79,7 @@ function generateSlots(employee: Employee, date: Date, duration: number, appoint
   return slots;
 }
 
-export function StepDateTime({ employee, serviceDuration, appointments, selectedDate, selectedTime, onSelect, onBack }: Props) {
+export function StepDateTime({ employee, serviceDuration, appointments, selectedDate, selectedTime, onSelect, onBack, onWaitingList }: Props) {
   const today = startOfDay(new Date());
   const [weekOffset, setWeekOffset] = useState(0);
   const [pickedDate, setPickedDate] = useState<Date | null>(selectedDate);
@@ -164,9 +165,15 @@ export function StepDateTime({ employee, serviceDuration, appointments, selected
               ))}
             </div>
           ) : (
-            <p className="text-center text-muted-foreground text-sm py-6">
-              Brak dostępnych terminów w tym dniu
-            </p>
+            <div className="text-center py-6 space-y-3">
+              <p className="text-muted-foreground text-sm">Brak dostępnych terminów w tym dniu</p>
+              {onWaitingList && (
+                <Button variant="outline" size="sm" onClick={() => onWaitingList(pickedDate)} className="gap-2">
+                  <Clock size={14} />
+                  Zapisz się na listę oczekujących
+                </Button>
+              )}
+            </div>
           )}
         </div>
       )}

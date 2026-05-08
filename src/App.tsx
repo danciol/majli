@@ -21,7 +21,9 @@ import AdminMessages from "./pages/admin/AdminMessages";
 import AdminSettings from "./pages/admin/AdminSettings";
 import AdminGallery from "./pages/admin/AdminGallery";
 import AdminReports from "./pages/admin/AdminReports";
+import AdminWaitingList from "./pages/admin/AdminWaitingList";
 import PrivacyPolicy from "./pages/PrivacyPolicy";
+import BookingWidget from "./pages/BookingWidget";
 import { AdminLayout } from "./components/admin/AdminLayout";
 
 const queryClient = new QueryClient();
@@ -44,6 +46,7 @@ const App = () => {
             <BrowserRouter>
               <Routes>
                 <Route path="/" element={<Index />} />
+                <Route path="/widget" element={<BookingWidget />} />
                 <Route path="/polityka-prywatnosci" element={<PrivacyPolicy />} />
                 <Route path="/admin/login" element={<AdminLogin />} />
                 <Route path="/admin" element={<AdminLayout />}>
@@ -57,6 +60,7 @@ const App = () => {
                   <Route path="raporty" element={<AdminReports />} />
                   <Route path="uslugi" element={<AdminServices />} />
                   <Route path="pracownicy" element={<AdminEmployees />} />
+                  <Route path="oczekujacy" element={<AdminWaitingList />} />
                 </Route>
                 <Route path="*" element={<NotFound />} />
               </Routes>

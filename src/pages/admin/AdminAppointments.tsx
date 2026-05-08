@@ -1,13 +1,18 @@
 import { useMemo, useState } from 'react';
-import { useAppointments, useServices, useEmployees } from '@/hooks/useFirestore';
+import { useAppointments, useServices, useEmployees, useSettings } from '@/hooks/useFirestore';
 import { format } from 'date-fns';
 import { pl } from 'date-fns/locale';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { NativeSelect } from '@/components/ui/native-select';
 import type { Appointment } from '@/data/services';
-import { CheckCircle, X, Loader2, Search, MessageSquare } from 'lucide-react';
+import { CheckCircle, X, Loader2, Search, MessageSquare, Star } from 'lucide-react';
 import { toast } from 'sonner';
+import { collection, query, where, getDocs, updateDoc, doc } from 'firebase/firestore';
+import { db } from '@/lib/firebase';
+import { sendSms } from '@/lib/textbee';
+import { useNavigate } from 'react-router-dom';
+import { salonConfig } from '@/config/salon';
 
 const statusLabels: Record<Appointment['status'], string> = {
   pending: 'Oczekuje',
@@ -22,6 +27,9 @@ const AdminAppointments = () => {
   const { appointments, loading: loadingA, updateAppointment } = useAppointments();
   const { services, loading: loadingS } = useServices();
   const { employees, loading: loadingE } = useEmployees();
+  const { googleReviewsUrl, textBeeApiKey, textBeeDeviceId } = useSettings();
+  const navigate = useNavigate();
+
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<'all' | Appointment['status']>('all');
   const [employeeFilter, setEmployeeFilter] = useState('all');
@@ -41,45 +49,77 @@ const AdminAppointments = () => {
   );
 
   const filteredAppointments = useMemo(() => {
-    const query = search.trim().toLowerCase();
-
+    const q = search.trim().toLowerCase();
     return [...appointments]
       .filter((appt) => {
         const service = serviceMap.get(appt.serviceId);
         const employee = employeeMap.get(appt.employeeId);
-
         if (statusFilter !== 'all' && appt.status !== statusFilter) return false;
         if (employeeFilter !== 'all' && appt.employeeId !== employeeFilter) return false;
         if (serviceFilter !== 'all' && appt.serviceId !== serviceFilter) return false;
-
-        if (!query) return true;
-
-        return [
-          appt.clientName,
-          appt.clientPhone,
-          appt.clientEmail,
-          service?.name || '',
-          employee?.name || '',
-        ].some((value) => value.toLowerCase().includes(query));
+        if (!q) return true;
+        return [appt.clientName, appt.clientPhone, appt.clientEmail, service?.name || '', employee?.name || '']
+          .some((v) => v.toLowerCase().includes(q));
       })
       .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
   }, [appointments, employeeFilter, employeeMap, search, serviceFilter, serviceMap, statusFilter]);
 
   const hasActiveFilters = search.trim() || statusFilter !== 'all' || employeeFilter !== 'all' || serviceFilter !== 'all';
+  const resetFilters = () => { setSearch(''); setStatusFilter('all'); setEmployeeFilter('all'); setServiceFilter('all'); };
 
-  const resetFilters = () => {
-    setSearch('');
-    setStatusFilter('all');
-    setEmployeeFilter('all');
-    setServiceFilter('all');
+  const checkWaitingList = async (appt: Appointment) => {
+    try {
+      const snap = await getDocs(
+        query(collection(db, 'waiting_list'),
+          where('serviceId', '==', appt.serviceId),
+          where('employeeId', '==', appt.employeeId),
+          where('notified', '==', false)
+        )
+      );
+      if (snap.size > 0) {
+        toast.info(`${snap.size} ${snap.size === 1 ? 'osoba czeka' : 'osoby czekają'} na ten termin`, {
+          action: { label: 'Powiadom', onClick: () => navigate('/admin/oczekujacy') },
+          duration: 8000,
+        });
+      }
+    } catch { /* brak uprawnień lub brak internetu */ }
   };
 
-  const handleStatusChange = async (id: string, status: Appointment['status']) => {
-    setUpdatingId(id);
+  const sendReviewSms = async (appt: Appointment) => {
+    if (!googleReviewsUrl || !appt.clientPhone || (appt as any).reviewSmsSent) return;
+    const service = serviceMap.get(appt.serviceId);
+    const message = `Dziękujemy za wizytę w ${salonConfig.name}! Jeśli jesteś zadowolona, zostaw nam opinię 🙏 ${googleReviewsUrl}`;
     try {
-      await updateAppointment(id, { status });
+      await sendSms([appt.clientPhone], message);
+      await updateDoc(doc(db, 'appointments', appt.id), { reviewSmsSent: true });
+      toast.success(`SMS z prośbą o opinię wysłany do ${appt.clientName}`);
+    } catch {
+      if (textBeeApiKey && textBeeDeviceId) {
+        toast.error('Błąd wysyłania SMS z opinią');
+      }
+    }
+  };
+
+  const handleStatusChange = async (appt: Appointment, status: Appointment['status']) => {
+    setUpdatingId(appt.id);
+    try {
+      await updateAppointment(appt.id, { status });
       toast.success(`Status zmieniony na: ${statusLabels[status].toLowerCase()}`);
+      if (status === 'cancelled') await checkWaitingList(appt);
+      if (status === 'completed') await sendReviewSms(appt);
     } catch { toast.error('Błąd zmiany statusu'); } finally { setUpdatingId(null); }
+  };
+
+  const handleManualReviewSms = async (appt: Appointment) => {
+    if (!googleReviewsUrl) { toast.error('Wpisz link Google Reviews w Ustawieniach'); return; }
+    const message = `Dziękujemy za wizytę w ${salonConfig.name}! Jeśli jesteś zadowolona, zostaw nam opinię 🙏 ${googleReviewsUrl}`;
+    try {
+      await sendSms([appt.clientPhone], message);
+      await updateDoc(doc(db, 'appointments', appt.id), { reviewSmsSent: true });
+      toast.success('SMS z prośbą o opinię wysłany');
+    } catch {
+      window.open(`sms:${appt.clientPhone}?body=${encodeURIComponent(message)}`, '_blank');
+    }
   };
 
   if (loading) return <div className="flex items-center justify-center py-20"><Loader2 className="w-6 h-6 animate-spin text-primary" /></div>;
@@ -97,42 +137,23 @@ const AdminAppointments = () => {
         <div className="flex flex-col gap-3 xl:flex-row xl:items-center">
           <div className="relative w-full xl:max-w-sm">
             <Search className="absolute left-3 top-1/2 w-4 h-4 -translate-y-1/2 text-muted-foreground" />
-            <Input
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder="Szukaj po kliencie, telefonie, usłudze lub pracowniku"
-              className="pl-9"
-            />
+            <Input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Szukaj po kliencie, telefonie, usłudze lub pracowniku" className="pl-9" />
           </div>
-
           <div className="grid gap-3 sm:grid-cols-2 xl:flex xl:flex-1">
             <NativeSelect value={statusFilter} onChange={(e) => setStatusFilter(e.target.value as 'all' | Appointment['status'])} className="h-10">
               <option value="all">Wszystkie statusy</option>
-              {statusOptions.map((status) => (
-                <option key={status} value={status}>{statusLabels[status]}</option>
-              ))}
+              {statusOptions.map((status) => <option key={status} value={status}>{statusLabels[status]}</option>)}
             </NativeSelect>
-
             <NativeSelect value={employeeFilter} onChange={(e) => setEmployeeFilter(e.target.value)} className="h-10">
               <option value="all">Wszyscy pracownicy</option>
-              {employees.map((employee) => (
-                <option key={employee.id} value={employee.id}>{employee.name}</option>
-              ))}
+              {employees.map((e) => <option key={e.id} value={e.id}>{e.name}</option>)}
             </NativeSelect>
-
             <NativeSelect value={serviceFilter} onChange={(e) => setServiceFilter(e.target.value)} className="h-10 sm:col-span-2 xl:col-span-1">
               <option value="all">Wszystkie usługi</option>
-              {services.map((service) => (
-                <option key={service.id} value={service.id}>{service.name}</option>
-              ))}
+              {services.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
             </NativeSelect>
           </div>
-
-          {hasActiveFilters && (
-            <Button variant="outline" size="sm" onClick={resetFilters}>
-              Wyczyść
-            </Button>
-          )}
+          {hasActiveFilters && <Button variant="outline" size="sm" onClick={resetFilters}>Wyczyść</Button>}
         </div>
       </div>
 
@@ -154,6 +175,7 @@ const AdminAppointments = () => {
                 const service = serviceMap.get(appt.serviceId);
                 const employee = employeeMap.get(appt.employeeId);
                 const isUpdating = updatingId === appt.id;
+                const reviewSent = (appt as any).reviewSmsSent;
 
                 return (
                   <tr key={appt.id} className="border-b border-border/50 hover:bg-secondary/30 transition-colors">
@@ -170,46 +192,52 @@ const AdminAppointments = () => {
                     </td>
                     <td className="p-3">
                       <p>{service?.name}</p>
-                      <p className="text-xs text-muted-foreground">{appt.duration} min &middot; {service?.price} zł</p>
+                      <p className="text-xs text-muted-foreground">{appt.duration} min · {service?.price} zł</p>
                     </td>
                     <td className="p-3">{employee?.name}</td>
                     <td className="p-3">
                       <div className="min-w-[160px]">
                         <NativeSelect
                           value={appt.status}
-                          onChange={(e) => handleStatusChange(appt.id, e.target.value as Appointment['status'])}
+                          onChange={(e) => handleStatusChange(appt, e.target.value as Appointment['status'])}
                           className="h-9 py-1 pr-8 text-xs font-medium"
                           disabled={isUpdating}
                         >
-                          {statusOptions.map((status) => (
-                            <option key={status} value={status}>{statusLabels[status]}</option>
-                          ))}
+                          {statusOptions.map((status) => <option key={status} value={status}>{statusLabels[status]}</option>)}
                         </NativeSelect>
                       </div>
                     </td>
                     <td className="p-3 text-right">
                       {isUpdating ? (
-                        <div className="flex justify-end">
-                          <Loader2 className="w-4 h-4 animate-spin text-primary" />
-                        </div>
+                        <div className="flex justify-end"><Loader2 className="w-4 h-4 animate-spin text-primary" /></div>
                       ) : (
                         <div className="flex justify-end gap-1">
                           <Button
-                            variant="ghost" size="icon" className="h-7 w-7" title="Wyślij SMS przypomnienie"
+                            variant="ghost" size="icon" className="h-7 w-7"
+                            title="Wyślij SMS przypomnienie"
                             disabled={!appt.clientPhone}
                             onClick={() => {
                               const date = format(new Date(appt.date), "d MMM 'o' HH:mm", { locale: pl });
-                              const service = serviceMap.get(appt.serviceId);
-                              const text = `Przypomnienie: wizyta w salonie Majli Beauty ${date} (${service?.name || 'wizyta'}). Do zobaczenia! 💅`;
+                              const text = `Przypomnienie: wizyta w salonie ${salonConfig.name} ${date} (${service?.name || 'wizyta'}). Do zobaczenia! 💅`;
                               window.open(`sms:${appt.clientPhone}?body=${encodeURIComponent(text)}`, '_blank');
                             }}
                           >
                             <MessageSquare className="w-3.5 h-3.5 text-blue-500" />
                           </Button>
-                          <Button variant="ghost" size="icon" className="h-7 w-7" title="Potwierdź" disabled={appt.status === 'confirmed'} onClick={() => handleStatusChange(appt.id, 'confirmed')}>
+                          {appt.status === 'completed' && googleReviewsUrl && (
+                            <Button
+                              variant="ghost" size="icon" className="h-7 w-7"
+                              title={reviewSent ? 'Opinia wysłana' : 'Wyślij prośbę o opinię'}
+                              disabled={!appt.clientPhone}
+                              onClick={() => handleManualReviewSms(appt)}
+                            >
+                              <Star className={`w-3.5 h-3.5 ${reviewSent ? 'text-yellow-500 fill-yellow-500' : 'text-yellow-500'}`} />
+                            </Button>
+                          )}
+                          <Button variant="ghost" size="icon" className="h-7 w-7" title="Potwierdź" disabled={appt.status === 'confirmed'} onClick={() => handleStatusChange(appt, 'confirmed')}>
                             <CheckCircle className="w-3.5 h-3.5 text-primary" />
                           </Button>
-                          <Button variant="ghost" size="icon" className="h-7 w-7" title="Anuluj" disabled={appt.status === 'cancelled'} onClick={() => handleStatusChange(appt.id, 'cancelled')}>
+                          <Button variant="ghost" size="icon" className="h-7 w-7" title="Anuluj" disabled={appt.status === 'cancelled'} onClick={() => handleStatusChange(appt, 'cancelled')}>
                             <X className="w-3.5 h-3.5 text-destructive" />
                           </Button>
                         </div>
