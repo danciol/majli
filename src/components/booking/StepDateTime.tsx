@@ -149,21 +149,32 @@ export function StepDateTime({ employee, serviceDuration, appointments, selected
             Dostępne godziny — {format(pickedDate, 'EEEE, d MMMM', { locale: pl })}
           </p>
           {slots.length > 0 ? (
-            <div className="grid grid-cols-4 gap-2 max-h-[30vh] overflow-y-auto">
-              {slots.map(time => (
-                <button
-                  key={time}
-                  onClick={() => onSelect(pickedDate, time)}
-                  className={`py-2.5 rounded-lg text-sm font-medium transition-all border ${
-                    selectedTime === time
-                      ? 'bg-primary text-primary-foreground border-primary'
-                      : 'border-border hover:border-primary/50 hover:bg-primary/5 text-foreground'
-                  }`}
-                >
-                  {time}
-                </button>
-              ))}
-            </div>
+            <>
+              <div className="grid grid-cols-4 gap-2 max-h-[30vh] overflow-y-auto">
+                {slots.map(time => (
+                  <button
+                    key={time}
+                    onClick={() => onSelect(pickedDate, time)}
+                    className={`py-2.5 rounded-lg text-sm font-medium transition-all border ${
+                      selectedTime === time
+                        ? 'bg-primary text-primary-foreground border-primary'
+                        : 'border-border hover:border-primary/50 hover:bg-primary/5 text-foreground'
+                    }`}
+                  >
+                    {time}
+                  </button>
+                ))}
+              </div>
+              {onWaitingList && (
+                <div className="mt-4 pt-4 border-t border-border text-center">
+                  <p className="text-xs text-muted-foreground mb-2">Żaden termin Ci nie odpowiada?</p>
+                  <Button variant="ghost" size="sm" onClick={() => onWaitingList(pickedDate)} className="gap-2 text-muted-foreground hover:text-foreground">
+                    <Clock size={14} />
+                    Zapisz się na listę oczekujących
+                  </Button>
+                </div>
+              )}
+            </>
           ) : (
             <div className="text-center py-6 space-y-3">
               <p className="text-muted-foreground text-sm">Brak dostępnych terminów w tym dniu</p>
