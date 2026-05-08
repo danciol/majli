@@ -15,6 +15,7 @@ export interface Service {
 export interface Employee {
   id: string;
   name: string;
+  email?: string;
   photo?: string;
   services?: string[];
   role?: string;

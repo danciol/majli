@@ -33,6 +33,7 @@ const dayLabelsShort: Record<string, string> = {
 
 interface EmployeeForm {
   name: string;
+  email: string;
   role: string;
   login: string;
   password: string;
@@ -56,14 +57,14 @@ const AdminEmployees = () => {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editing, setEditing] = useState<Employee | null>(null);
   const [form, setForm] = useState<EmployeeForm>({
-    name: '', role: 'pracownik', login: '', password: '',
+    name: '', email: '', role: 'pracownik', login: '', password: '',
     workingHours: { ...defaultWorkingHours }, daysOff: '', canViewCalendars: [],
   });
 
   const openNew = () => {
     setEditing(null);
     setForm({
-      name: '', role: 'pracownik', login: '', password: '',
+      name: '', email: '', role: 'pracownik', login: '', password: '',
       workingHours: { ...defaultWorkingHours }, daysOff: '', canViewCalendars: [],
     });
     setDialogOpen(true);
@@ -78,6 +79,7 @@ const AdminEmployees = () => {
     }
     setForm({
       name: e.name,
+      email: e.email || '',
       role: e.role || 'pracownik',
       login: e.login || '',
       password: e.password || '',
@@ -98,6 +100,7 @@ const AdminEmployees = () => {
       const daysOff = form.daysOff.split(',').map(s => s.trim()).filter(Boolean);
       const data: Record<string, unknown> = {
         name: form.name,
+        email: form.email,
         role: form.role,
         login: form.login,
         password: form.password,
@@ -214,13 +217,23 @@ const AdminEmployees = () => {
                 </SelectContent>
               </Select>
             </div>
+            <div>
+              <Label>E-mail (do logowania)</Label>
+              <Input
+                type="email"
+                value={form.email}
+                onChange={e => setForm(f => ({ ...f, email: e.target.value }))}
+                placeholder="pracownik@email.pl"
+              />
+              <p className="text-xs text-muted-foreground mt-1">Musi być taki sam jak w Firebase Authentication</p>
+            </div>
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <Label>Login</Label>
+                <Label>Login <span className="text-muted-foreground font-normal">(nieużywany)</span></Label>
                 <Input value={form.login} onChange={e => setForm(f => ({ ...f, login: e.target.value }))} />
               </div>
               <div>
-                <Label>Hasło</Label>
+                <Label>Hasło <span className="text-muted-foreground font-normal">(nieużywane)</span></Label>
                 <Input value={form.password} onChange={e => setForm(f => ({ ...f, password: e.target.value }))} />
               </div>
             </div>
