@@ -35,6 +35,9 @@ function getDayHours(workingHours: Employee['workingHours'], dayOfWeek: number) 
 }
 
 function generateSlots(employee: Employee, date: Date, duration: number, appointments: Appointment[]): string[] {
+  const dayStr = format(date, 'yyyy-MM-dd');
+  if ((employee.daysOff || []).includes(dayStr)) return [];
+
   const hours = getDayHours(employee.workingHours, date.getDay());
   if (!hours) return [];
 

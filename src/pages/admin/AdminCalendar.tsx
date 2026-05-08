@@ -1,8 +1,11 @@
 import { useState } from 'react';
 import { format, addDays, startOfWeek, isSameDay } from 'date-fns';
 import { pl } from 'date-fns/locale';
-import { ChevronLeft, ChevronRight, Plus, Loader2 } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Plus, Loader2, CalendarOff, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Appointment } from '@/data/services';
 import { useAppointments, useServices, useEmployees, useClients } from '@/hooks/useFirestore';
 import { useAuth } from '@/contexts/AuthContext';
@@ -34,7 +37,6 @@ function normalizePhone(phone: string): string {
   return phone.replace(/\D/g, '').slice(-9);
 }
 
-// Build overlap layout for a list of appointments in one column
 function buildLayout(appts: Appointment[]) {
   const sorted = [...appts].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
   const columns: { end: number; appt: Appointment }[][] = [];
@@ -91,13 +93,19 @@ const AdminCalendar = () => {
   const [viewMode, setViewMode] = useState<'week' | 'day'>('week');
   const { appointments, loading: loadingA, addAppointment, updateAppointment, deleteAppointment } = useAppointments();
   const { services, loading: loadingS } = useServices();
-  const { employees, loading: loadingE } = useEmployees();
+  const { employees, loading: loadingE, updateEmployee } = useEmployees();
   const { clients, addClient, updateClient } = useClients();
   const { employee: currentUser } = useAuth();
   const [apptDialogOpen, setApptDialogOpen] = useState(false);
   const [editingAppointment, setEditingAppointment] = useState<Appointment | null>(null);
   const [newApptDate, setNewApptDate] = useState<Date | null>(null);
   const [filterEmployeeId, setFilterEmployeeId] = useState<string>('all');
+
+  // Days off dialog state
+  const [daysOffOpen, setDaysOffOpen] = useState(false);
+  const [daysOffEmpId, setDaysOffEmpId] = useState<string>('');
+  const [newDayOff, setNewDayOff] = useState('');
+  const [savingDaysOff, setSavingDaysOff] = useState(false);
 
   const isAdmin = currentUser?.role === 'admin';
   const visibleEmployees = (isAdmin
@@ -113,9 +121,41 @@ const AdminCalendar = () => {
 
   const loading = loadingA || loadingS || loadingE;
 
-  // Week: Mon–Sat (6 days)
+  // Week: Mon–Sun (7 days)
   const weekStart = startOfWeek(currentDate, { weekStartsOn: 1 });
-  const weekDays = Array.from({ length: 6 }, (_, i) => addDays(weekStart, i));
+  const weekDays = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i));
+
+  const daysOffEmployee = employees.find(e => e.id === daysOffEmpId);
+
+  const openDaysOff = () => {
+    setDaysOffEmpId(isAdmin ? (visibleEmployees[0]?.id || '') : (currentUser?.id || ''));
+    setNewDayOff('');
+    setDaysOffOpen(true);
+  };
+
+  const handleAddDayOff = async () => {
+    if (!newDayOff || !daysOffEmployee) return;
+    setSavingDaysOff(true);
+    try {
+      const current = daysOffEmployee.daysOff || [];
+      if (!current.includes(newDayOff)) {
+        await updateEmployee(daysOffEmployee.id, { daysOff: [...current, newDayOff].sort() });
+      }
+      setNewDayOff('');
+      toast.success('Dzień wolny dodany');
+    } catch { toast.error('Błąd zapisu'); }
+    setSavingDaysOff(false);
+  };
+
+  const handleRemoveDayOff = async (date: string) => {
+    if (!daysOffEmployee) return;
+    try {
+      await updateEmployee(daysOffEmployee.id, {
+        daysOff: (daysOffEmployee.daysOff || []).filter(d => d !== date),
+      });
+      toast.success('Dzień wolny usunięty');
+    } catch { toast.error('Błąd zapisu'); }
+  };
 
   const upsertClient = async (name: string, phone: string, email: string) => {
     if (!name || !phone) return;
@@ -160,7 +200,11 @@ const AdminCalendar = () => {
       isSameDay(new Date(a.date), day) && (empId ? a.employeeId === empId : true)
     );
 
-  // Day view: employees that have appointments OR all visible (if filtered)
+  const isDayOff = (day: Date, empId: string) => {
+    const emp = employees.find(e => e.id === empId);
+    return (emp?.daysOff || []).includes(format(day, 'yyyy-MM-dd'));
+  };
+
   const dayViewEmployees = filterEmployeeId !== 'all'
     ? visibleEmployees.filter(e => e.id === filterEmployeeId)
     : visibleEmployees;
@@ -170,10 +214,9 @@ const AdminCalendar = () => {
   };
 
   const rangeLabel = viewMode === 'week'
-    ? `${format(weekDays[0], 'd MMM', { locale: pl })} – ${format(weekDays[5], 'd MMM yyyy', { locale: pl })}`
+    ? `${format(weekDays[0], 'd MMM', { locale: pl })} – ${format(weekDays[6], 'd MMM yyyy', { locale: pl })}`
     : format(currentDate, 'EEEE, d MMMM yyyy', { locale: pl });
 
-  // Shared appointment card renderer
   const ApptCard = ({ a, topPx, heightPx, widthPct, leftPct }: {
     a: Appointment; topPx: number; heightPx: number; widthPct: number; leftPct: number;
   }) => {
@@ -198,22 +241,37 @@ const AdminCalendar = () => {
     );
   };
 
-  // Column renderer (shared between week-day and day-employee columns)
   const TimeColumn = ({ day, empId }: { day: Date; empId?: string }) => {
+    const dayStr = format(day, 'yyyy-MM-dd');
     const appts = getDayAppointments(day, empId);
     const layout = buildLayout(appts);
+
+    // Show day-off overlay when a specific employee is known for this column
+    const effectiveEmpId = empId || (filterEmployeeId !== 'all' ? filterEmployeeId : null);
+    const isOff = effectiveEmpId ? isDayOff(day, effectiveEmpId) : false;
+
     return (
       <div className="border-l border-border/40 relative">
+        {isOff && (
+          <div className="absolute inset-0 z-[5] bg-secondary/70 flex items-center justify-center pointer-events-none">
+            <span className="text-[11px] text-muted-foreground font-medium opacity-60 select-none"
+              style={{ writingMode: 'vertical-rl', transform: 'rotate(180deg)' }}>
+              dzień wolny
+            </span>
+          </div>
+        )}
         {hours.map(hour => (
           <div
             key={hour}
             className="border-b border-border/40 group cursor-pointer hover:bg-secondary/30 transition-colors"
             style={{ height: HOUR_HEIGHT }}
-            onClick={() => openNew(day, hour)}
+            onClick={() => !isOff && openNew(day, hour)}
           >
-            <div className="flex items-center justify-center h-full opacity-0 group-hover:opacity-100 transition-opacity">
-              <Plus className="w-4 h-4 text-muted-foreground/40" />
-            </div>
+            {!isOff && (
+              <div className="flex items-center justify-center h-full opacity-0 group-hover:opacity-100 transition-opacity">
+                <Plus className="w-4 h-4 text-muted-foreground/40" />
+              </div>
+            )}
           </div>
         ))}
         {appts.map(a => {
@@ -259,6 +317,11 @@ const AdminCalendar = () => {
             </NativeSelect>
           )}
 
+          <Button variant="outline" size="sm" onClick={openDaysOff} className="gap-1.5">
+            <CalendarOff className="w-4 h-4" />
+            Dni wolne
+          </Button>
+
           <div className="flex items-center gap-1">
             <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => navigate(-1)}><ChevronLeft className="w-4 h-4" /></Button>
             <span className="text-sm font-medium min-w-[200px] text-center capitalize">{rangeLabel}</span>
@@ -269,27 +332,30 @@ const AdminCalendar = () => {
 
       <div className="bg-card rounded-xl border border-border shadow-sm overflow-auto">
         {viewMode === 'week' ? (
-          // --- WEEK VIEW: Mon–Sat ---
-          <div style={{ minWidth: 700 }}>
-            <div className={`grid border-b border-border sticky top-0 bg-card z-10`} style={{ gridTemplateColumns: `56px repeat(6, 1fr)` }}>
+          // --- WEEK VIEW: Mon–Sun ---
+          <div style={{ minWidth: 800 }}>
+            <div className="grid border-b border-border sticky top-0 bg-card z-10" style={{ gridTemplateColumns: `56px repeat(7, 1fr)` }}>
               <div className="p-2" />
               {weekDays.map(day => {
                 const isToday = isSameDay(day, new Date());
+                const effectiveEmpId = filterEmployeeId !== 'all' ? filterEmployeeId : null;
+                const isOff = effectiveEmpId ? isDayOff(day, effectiveEmpId) : false;
                 return (
                   <div
                     key={day.toISOString()}
-                    className="p-2 text-center border-l border-border cursor-pointer hover:bg-secondary/40 transition-colors"
+                    className={`p-2 text-center border-l border-border cursor-pointer hover:bg-secondary/40 transition-colors ${isOff ? 'bg-secondary/30' : ''}`}
                     onClick={() => { setCurrentDate(day); setViewMode('day'); }}
                   >
                     <p className="text-xs text-muted-foreground uppercase tracking-wide">{format(day, 'EEE', { locale: pl })}</p>
                     <div className={`inline-flex items-center justify-center w-9 h-9 rounded-full text-lg font-semibold mt-0.5 ${isToday ? 'bg-primary text-primary-foreground' : 'text-foreground'}`}>
                       {format(day, 'd')}
                     </div>
+                    {isOff && <p className="text-[10px] text-muted-foreground mt-0.5">wolne</p>}
                   </div>
                 );
               })}
             </div>
-            <div style={{ display: 'grid', gridTemplateColumns: `56px repeat(6, 1fr)` }} className="relative">
+            <div style={{ display: 'grid', gridTemplateColumns: `56px repeat(7, 1fr)` }} className="relative">
               <div>
                 {hours.map(hour => (
                   <div key={hour} className="pr-2 text-[11px] text-muted-foreground text-right border-b border-border/40" style={{ height: HOUR_HEIGHT }}>
@@ -308,13 +374,14 @@ const AdminCalendar = () => {
               <div className="p-2" />
               {dayViewEmployees.map(emp => {
                 const empColor = getEmployeeColor(emp.id, employees);
+                const isOff = isDayOff(currentDate, emp.id);
                 return (
-                  <div key={emp.id} className={`p-3 text-center border-l border-border`}>
+                  <div key={emp.id} className={`p-3 text-center border-l border-border ${isOff ? 'bg-secondary/30' : ''}`}>
                     <div className={`inline-block px-2 py-0.5 rounded-full text-xs font-semibold ${empColor.bg} ${empColor.text}`}>
                       {emp.name}
                     </div>
                     <p className="text-xs text-muted-foreground mt-1">
-                      {getDayAppointments(currentDate, emp.id).length} wizyt
+                      {isOff ? 'dzień wolny' : `${getDayAppointments(currentDate, emp.id).length} wizyt`}
                     </p>
                   </div>
                 );
@@ -344,6 +411,78 @@ const AdminCalendar = () => {
         onSave={handleSaveAppointment}
         onDelete={handleDeleteAppointment}
       />
+
+      {/* Days Off Dialog */}
+      <Dialog open={daysOffOpen} onOpenChange={setDaysOffOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <CalendarOff className="w-5 h-5 text-primary" />
+              Dni wolne
+            </DialogTitle>
+          </DialogHeader>
+
+          <div className="space-y-4 py-1">
+            {/* Employee selector (admin only) */}
+            {isAdmin && visibleEmployees.length > 1 && (
+              <div className="space-y-1.5">
+                <Label>Pracownik</Label>
+                <NativeSelect
+                  value={daysOffEmpId}
+                  onChange={e => setDaysOffEmpId(e.target.value)}
+                  className="w-full"
+                >
+                  {visibleEmployees.map(e => (
+                    <option key={e.id} value={e.id}>{e.name}</option>
+                  ))}
+                </NativeSelect>
+              </div>
+            )}
+
+            {/* Add new day off */}
+            <div className="space-y-1.5">
+              <Label>Dodaj dzień wolny</Label>
+              <div className="flex gap-2">
+                <Input
+                  type="date"
+                  value={newDayOff}
+                  onChange={e => setNewDayOff(e.target.value)}
+                  min={format(new Date(), 'yyyy-MM-dd')}
+                  className="flex-1"
+                />
+                <Button onClick={handleAddDayOff} disabled={!newDayOff || savingDaysOff} className="shrink-0">
+                  {savingDaysOff ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Dodaj'}
+                </Button>
+              </div>
+            </div>
+
+            {/* List of days off */}
+            <div className="space-y-1.5">
+              <Label>Zaplanowane dni wolne</Label>
+              {(daysOffEmployee?.daysOff || []).length === 0 ? (
+                <p className="text-sm text-muted-foreground py-3 text-center">Brak zaplanowanych dni wolnych</p>
+              ) : (
+                <div className="space-y-1 max-h-52 overflow-y-auto">
+                  {(daysOffEmployee?.daysOff || []).map(dateStr => (
+                    <div key={dateStr} className="flex items-center justify-between px-3 py-2 rounded-lg bg-secondary/50 text-sm">
+                      <span className="font-medium">
+                        {format(new Date(dateStr + 'T12:00:00'), 'EEEE, d MMMM yyyy', { locale: pl })}
+                      </span>
+                      <button
+                        onClick={() => handleRemoveDayOff(dateStr)}
+                        className="text-muted-foreground hover:text-destructive transition-colors ml-2"
+                        title="Usuń"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
