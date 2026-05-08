@@ -1,7 +1,7 @@
 import { Outlet, Link, useLocation, useNavigate, Navigate } from 'react-router-dom';
 import {
   LayoutDashboard, Calendar, Scissors, Users, ClipboardList,
-  LogOut, Menu, X, UserCheck, MessageSquare, Settings, Images, TrendingUp, Clock,
+  LogOut, Menu, X, UserCheck, MessageSquare, Settings, Images, TrendingUp, Clock, CalendarOff,
 } from 'lucide-react';
 import { useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
@@ -20,6 +20,7 @@ interface NavLink {
 const allLinks: NavLink[] = [
   { to: '/admin',              label: 'Dashboard',   icon: LayoutDashboard, roles: ['admin','pracownik'], feature: 'dashboard' },
   { to: '/admin/kalendarz',    label: 'Kalendarz',   icon: Calendar,        roles: ['admin','pracownik'], feature: 'calendar' },
+  { to: '/admin/dni-wolne',   label: 'Dni wolne',   icon: CalendarOff,     roles: ['admin','pracownik'], feature: 'calendar' },
   { to: '/admin/wizyty',       label: 'Wizyty',      icon: ClipboardList,   roles: ['admin'],             feature: 'appointments' },
   { to: '/admin/klienci',      label: 'Klienci',     icon: UserCheck,       roles: ['admin'],             feature: 'clients' },
   { to: '/admin/pracownicy',   label: 'Pracownicy',  icon: Users,           roles: ['admin'],             feature: 'employees' },

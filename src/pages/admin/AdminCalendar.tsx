@@ -1,11 +1,8 @@
 import { useState } from 'react';
 import { format, addDays, startOfWeek, isSameDay } from 'date-fns';
 import { pl } from 'date-fns/locale';
-import { ChevronLeft, ChevronRight, Plus, Loader2, CalendarOff, Trash2 } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Plus, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Appointment } from '@/data/services';
 import { useAppointments, useServices, useEmployees, useClients } from '@/hooks/useFirestore';
 import { useAuth } from '@/contexts/AuthContext';
@@ -93,7 +90,7 @@ const AdminCalendar = () => {
   const [viewMode, setViewMode] = useState<'week' | 'day'>('week');
   const { appointments, loading: loadingA, addAppointment, updateAppointment, deleteAppointment } = useAppointments();
   const { services, loading: loadingS } = useServices();
-  const { employees, loading: loadingE, updateEmployee } = useEmployees();
+  const { employees, loading: loadingE } = useEmployees();
   const { clients, addClient, updateClient } = useClients();
   const { employee: currentUser } = useAuth();
   const [apptDialogOpen, setApptDialogOpen] = useState(false);
@@ -101,11 +98,6 @@ const AdminCalendar = () => {
   const [newApptDate, setNewApptDate] = useState<Date | null>(null);
   const [filterEmployeeId, setFilterEmployeeId] = useState<string>('all');
 
-  // Days off dialog state
-  const [daysOffOpen, setDaysOffOpen] = useState(false);
-  const [daysOffEmpId, setDaysOffEmpId] = useState<string>('');
-  const [newDayOff, setNewDayOff] = useState('');
-  const [savingDaysOff, setSavingDaysOff] = useState(false);
 
   const isAdmin = currentUser?.role === 'admin';
   const visibleEmployees = (isAdmin
@@ -124,38 +116,6 @@ const AdminCalendar = () => {
   // Week: Mon–Sun (7 days)
   const weekStart = startOfWeek(currentDate, { weekStartsOn: 1 });
   const weekDays = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i));
-
-  const daysOffEmployee = employees.find(e => e.id === daysOffEmpId);
-
-  const openDaysOff = () => {
-    setDaysOffEmpId(isAdmin ? (visibleEmployees[0]?.id || '') : (currentUser?.id || ''));
-    setNewDayOff('');
-    setDaysOffOpen(true);
-  };
-
-  const handleAddDayOff = async () => {
-    if (!newDayOff || !daysOffEmployee) return;
-    setSavingDaysOff(true);
-    try {
-      const current = daysOffEmployee.daysOff || [];
-      if (!current.includes(newDayOff)) {
-        await updateEmployee(daysOffEmployee.id, { daysOff: [...current, newDayOff].sort() });
-      }
-      setNewDayOff('');
-      toast.success('Dzień wolny dodany');
-    } catch { toast.error('Błąd zapisu'); }
-    setSavingDaysOff(false);
-  };
-
-  const handleRemoveDayOff = async (date: string) => {
-    if (!daysOffEmployee) return;
-    try {
-      await updateEmployee(daysOffEmployee.id, {
-        daysOff: (daysOffEmployee.daysOff || []).filter(d => d !== date),
-      });
-      toast.success('Dzień wolny usunięty');
-    } catch { toast.error('Błąd zapisu'); }
-  };
 
   const upsertClient = async (name: string, phone: string, email: string) => {
     if (!name || !phone) return;
@@ -317,11 +277,6 @@ const AdminCalendar = () => {
             </NativeSelect>
           )}
 
-          <Button variant="outline" size="sm" onClick={openDaysOff} className="gap-1.5">
-            <CalendarOff className="w-4 h-4" />
-            Dni wolne
-          </Button>
-
           <div className="flex items-center gap-1">
             <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => navigate(-1)}><ChevronLeft className="w-4 h-4" /></Button>
             <span className="text-sm font-medium min-w-[200px] text-center capitalize">{rangeLabel}</span>
@@ -412,77 +367,6 @@ const AdminCalendar = () => {
         onDelete={handleDeleteAppointment}
       />
 
-      {/* Days Off Dialog */}
-      <Dialog open={daysOffOpen} onOpenChange={setDaysOffOpen}>
-        <DialogContent className="max-w-md">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <CalendarOff className="w-5 h-5 text-primary" />
-              Dni wolne
-            </DialogTitle>
-          </DialogHeader>
-
-          <div className="space-y-4 py-1">
-            {/* Employee selector (admin only) */}
-            {isAdmin && visibleEmployees.length > 1 && (
-              <div className="space-y-1.5">
-                <Label>Pracownik</Label>
-                <NativeSelect
-                  value={daysOffEmpId}
-                  onChange={e => setDaysOffEmpId(e.target.value)}
-                  className="w-full"
-                >
-                  {visibleEmployees.map(e => (
-                    <option key={e.id} value={e.id}>{e.name}</option>
-                  ))}
-                </NativeSelect>
-              </div>
-            )}
-
-            {/* Add new day off */}
-            <div className="space-y-1.5">
-              <Label>Dodaj dzień wolny</Label>
-              <div className="flex gap-2">
-                <Input
-                  type="date"
-                  value={newDayOff}
-                  onChange={e => setNewDayOff(e.target.value)}
-                  min={format(new Date(), 'yyyy-MM-dd')}
-                  className="flex-1"
-                />
-                <Button onClick={handleAddDayOff} disabled={!newDayOff || savingDaysOff} className="shrink-0">
-                  {savingDaysOff ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Dodaj'}
-                </Button>
-              </div>
-            </div>
-
-            {/* List of days off */}
-            <div className="space-y-1.5">
-              <Label>Zaplanowane dni wolne</Label>
-              {(daysOffEmployee?.daysOff || []).length === 0 ? (
-                <p className="text-sm text-muted-foreground py-3 text-center">Brak zaplanowanych dni wolnych</p>
-              ) : (
-                <div className="space-y-1 max-h-52 overflow-y-auto">
-                  {(daysOffEmployee?.daysOff || []).map(dateStr => (
-                    <div key={dateStr} className="flex items-center justify-between px-3 py-2 rounded-lg bg-secondary/50 text-sm">
-                      <span className="font-medium">
-                        {format(new Date(dateStr + 'T12:00:00'), 'EEEE, d MMMM yyyy', { locale: pl })}
-                      </span>
-                      <button
-                        onClick={() => handleRemoveDayOff(dateStr)}
-                        className="text-muted-foreground hover:text-destructive transition-colors ml-2"
-                        title="Usuń"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          </div>
-        </DialogContent>
-      </Dialog>
     </div>
   );
 };

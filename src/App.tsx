@@ -22,6 +22,7 @@ import AdminSettings from "./pages/admin/AdminSettings";
 import AdminGallery from "./pages/admin/AdminGallery";
 import AdminReports from "./pages/admin/AdminReports";
 import AdminWaitingList from "./pages/admin/AdminWaitingList";
+import AdminDaysOff from "./pages/admin/AdminDaysOff";
 import PrivacyPolicy from "./pages/PrivacyPolicy";
 import BookingWidget from "./pages/BookingWidget";
 import { AdminLayout } from "./components/admin/AdminLayout";
@@ -61,6 +62,7 @@ const App = () => {
                   <Route path="uslugi" element={<AdminServices />} />
                   <Route path="pracownicy" element={<AdminEmployees />} />
                   <Route path="oczekujacy" element={<AdminWaitingList />} />
+                  <Route path="dni-wolne" element={<AdminDaysOff />} />
                 </Route>
                 <Route path="*" element={<NotFound />} />
               </Routes>
