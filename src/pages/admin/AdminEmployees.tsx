@@ -13,6 +13,17 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select';
 import { toast } from 'sonner';
+import { initializeApp, deleteApp } from 'firebase/app';
+import {
+  getAuth,
+  createUserWithEmailAndPassword,
+  signInWithEmailAndPassword as fbSignIn,
+  updatePassword,
+  deleteUser,
+  signOut as fbSignOut,
+} from 'firebase/auth';
+import { salonConfig } from '@/config/salon';
+import { loginToEmail } from '@/lib/auth';
 
 const DAYS = [
   { key: 'monday', label: 'Poniedziałek' },
@@ -33,10 +44,9 @@ const dayLabelsShort: Record<string, string> = {
 
 interface EmployeeForm {
   name: string;
-  email: string;
-  role: string;
   login: string;
   password: string;
+  role: string;
   workingHours: Record<string, string>;
   daysOff: string;
   canViewCalendars: string[];
@@ -52,19 +62,34 @@ const defaultWorkingHours: Record<string, string> = {
   sunday: 'wolne',
 };
 
+// Use a secondary Firebase app to create/update/delete auth accounts
+// without affecting the currently logged-in admin session.
+async function withSecondaryAuth<T>(fn: (secondaryAuth: ReturnType<typeof getAuth>) => Promise<T>): Promise<T> {
+  const appName = `emp-op-${Date.now()}`;
+  const secondaryApp = initializeApp(salonConfig.firebase, appName);
+  const secondaryAuth = getAuth(secondaryApp);
+  try {
+    return await fn(secondaryAuth);
+  } finally {
+    await fbSignOut(secondaryAuth).catch(() => {});
+    await deleteApp(secondaryApp).catch(() => {});
+  }
+}
+
 const AdminEmployees = () => {
   const { employees, loading, addEmployee, updateEmployee, deleteEmployee } = useEmployees();
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editing, setEditing] = useState<Employee | null>(null);
+  const [saving, setSaving] = useState(false);
   const [form, setForm] = useState<EmployeeForm>({
-    name: '', email: '', role: 'pracownik', login: '', password: '',
+    name: '', login: '', password: '', role: 'pracownik',
     workingHours: { ...defaultWorkingHours }, daysOff: '', canViewCalendars: [],
   });
 
   const openNew = () => {
     setEditing(null);
     setForm({
-      name: '', email: '', role: 'pracownik', login: '', password: '',
+      name: '', login: '', password: '', role: 'pracownik',
       workingHours: { ...defaultWorkingHours }, daysOff: '', canViewCalendars: [],
     });
     setDialogOpen(true);
@@ -72,17 +97,15 @@ const AdminEmployees = () => {
 
   const openEdit = (e: Employee) => {
     setEditing(e);
-    // Convert workingHours to string format if needed
     const wh: Record<string, string> = {};
     for (const [day, val] of Object.entries(e.workingHours)) {
       wh[day] = typeof val === 'string' ? val : `${val.start}-${val.end}`;
     }
     setForm({
       name: e.name,
-      email: e.email || '',
-      role: e.role || 'pracownik',
       login: e.login || '',
-      password: e.password || '',
+      password: '',
+      role: e.role || 'pracownik',
       workingHours: wh,
       daysOff: (e.daysOff || []).join(', '),
       canViewCalendars: e.canViewCalendars || [],
@@ -95,35 +118,91 @@ const AdminEmployees = () => {
   };
 
   const handleSave = async () => {
-    if (!form.name) { toast.error('Wprowadź imię'); return; }
+    if (!form.name.trim()) { toast.error('Wprowadź imię'); return; }
+    if (!editing) {
+      if (!form.login.trim()) { toast.error('Wprowadź login'); return; }
+      if (!form.password.trim()) { toast.error('Wprowadź hasło'); return; }
+      if (form.password.length < 6) { toast.error('Hasło musi mieć minimum 6 znaków'); return; }
+    }
+
+    setSaving(true);
     try {
       const daysOff = form.daysOff.split(',').map(s => s.trim()).filter(Boolean);
-      const data: Record<string, unknown> = {
-        name: form.name,
-        email: form.email,
-        role: form.role,
-        login: form.login,
-        password: form.password,
-        workingHours: form.workingHours,
-        daysOff,
-        canViewCalendars: form.canViewCalendars,
-      };
+
       if (editing) {
-        await updateEmployee(editing.id, data as Partial<Employee>);
+        // Update Firestore data
+        const data: Partial<Employee> = {
+          name: form.name,
+          role: form.role as Employee['role'],
+          workingHours: form.workingHours,
+          daysOff,
+          canViewCalendars: form.canViewCalendars,
+        };
+
+        // If new password provided, update Firebase Auth
+        if (form.password.trim()) {
+          if (form.password.length < 6) { toast.error('Hasło musi mieć minimum 6 znaków'); setSaving(false); return; }
+          const empLogin = editing.login || '';
+          const empEmail = editing.email || loginToEmail(empLogin);
+          const storedPassword = editing.password || '';
+
+          try {
+            await withSecondaryAuth(async (secondaryAuth) => {
+              const cred = await fbSignIn(secondaryAuth, empEmail, storedPassword);
+              await updatePassword(cred.user, form.password);
+            });
+            data.password = form.password;
+          } catch {
+            toast.warning('Dane zaktualizowane, ale zmiana hasła nie powiodła się — stare hasło mogło być inne');
+          }
+        }
+
+        await updateEmployee(editing.id, data);
         toast.success('Pracownik zaktualizowany');
       } else {
-        data.canViewCalendars = [];
-        await addEmployee(data as Omit<Employee, 'id'>);
+        // New employee — create Firebase Auth account
+        const email = loginToEmail(form.login);
+        await withSecondaryAuth(async (secondaryAuth) => {
+          await createUserWithEmailAndPassword(secondaryAuth, email, form.password);
+        });
+
+        await addEmployee({
+          name: form.name,
+          email,
+          login: form.login.toLowerCase().trim(),
+          password: form.password,
+          role: form.role,
+          workingHours: form.workingHours,
+          daysOff,
+          canViewCalendars: [],
+        });
         toast.success('Pracownik dodany');
       }
+
       setDialogOpen(false);
-    } catch {
-      toast.error('Błąd zapisu');
+    } catch (e: any) {
+      if (e?.code === 'auth/email-already-in-use') toast.error('Login jest już zajęty');
+      else if (e?.code === 'auth/weak-password') toast.error('Hasło musi mieć minimum 6 znaków');
+      else if (e?.code === 'auth/invalid-credential') toast.error('Błąd autoryzacji — sprawdź dane pracownika');
+      else toast.error('Błąd zapisu');
+    } finally {
+      setSaving(false);
     }
   };
 
   const handleDelete = async (id: string) => {
+    const emp = employees.find(e => e.id === id);
     try {
+      // Try to delete Firebase Auth account
+      if (emp?.login && emp?.password) {
+        const empEmail = emp.email || loginToEmail(emp.login);
+        await withSecondaryAuth(async (secondaryAuth) => {
+          const cred = await fbSignIn(secondaryAuth, empEmail, emp.password!);
+          await deleteUser(cred.user);
+        }).catch(() => {
+          // If Firebase Auth deletion fails, continue — Firestore record will be removed
+        });
+      }
       await deleteEmployee(id);
       toast.success('Pracownik usunięty');
     } catch {
@@ -153,6 +232,7 @@ const AdminEmployees = () => {
                 <div>
                   <h3 className="font-heading font-semibold">{emp.name}</h3>
                   <p className="text-xs text-muted-foreground capitalize">{emp.role || 'pracownik'}</p>
+                  {emp.login && <p className="text-xs text-muted-foreground font-mono">@{emp.login}</p>}
                 </div>
               </div>
               <div className="flex gap-1">
@@ -183,11 +263,8 @@ const AdminEmployees = () => {
             )}
 
             {emp.daysOff && emp.daysOff.length > 0 && (
-              <p className="text-xs text-muted-foreground">
-                Dni wolne: {emp.daysOff.length}
-              </p>
+              <p className="text-xs text-muted-foreground">Dni wolne: {emp.daysOff.length}</p>
             )}
-
           </div>
         ))}
       </div>
@@ -203,7 +280,7 @@ const AdminEmployees = () => {
           </DialogHeader>
           <div className="space-y-4 pt-2">
             <div>
-              <Label>Imię</Label>
+              <Label>Imię i nazwisko</Label>
               <Input value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} />
             </div>
             <div>
@@ -217,26 +294,39 @@ const AdminEmployees = () => {
                 </SelectContent>
               </Select>
             </div>
-            <div>
-              <Label>E-mail (do logowania)</Label>
-              <Input
-                type="email"
-                value={form.email}
-                onChange={e => setForm(f => ({ ...f, email: e.target.value }))}
-                placeholder="pracownik@email.pl"
-              />
-              <p className="text-xs text-muted-foreground mt-1">Musi być taki sam jak w Firebase Authentication</p>
-            </div>
+
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <Label>Login <span className="text-muted-foreground font-normal">(nieużywany)</span></Label>
-                <Input value={form.login} onChange={e => setForm(f => ({ ...f, login: e.target.value }))} />
+                <Label>Login</Label>
+                {editing ? (
+                  <div className="flex items-center h-10 px-3 rounded-md border border-border bg-secondary/50 text-sm font-mono text-muted-foreground">
+                    {editing.login || '—'}
+                  </div>
+                ) : (
+                  <Input
+                    value={form.login}
+                    onChange={e => setForm(f => ({ ...f, login: e.target.value.toLowerCase().replace(/\s/g, '') }))}
+                    placeholder="np. anna"
+                    autoCapitalize="none"
+                  />
+                )}
               </div>
               <div>
-                <Label>Hasło <span className="text-muted-foreground font-normal">(nieużywane)</span></Label>
-                <Input value={form.password} onChange={e => setForm(f => ({ ...f, password: e.target.value }))} />
+                <Label>{editing ? 'Nowe hasło (opcjonalne)' : 'Hasło'}</Label>
+                <Input
+                  type="password"
+                  value={form.password}
+                  onChange={e => setForm(f => ({ ...f, password: e.target.value }))}
+                  placeholder={editing ? 'Zostaw puste — bez zmian' : 'Min. 6 znaków'}
+                />
               </div>
             </div>
+
+            {!editing && (
+              <p className="text-xs text-muted-foreground -mt-2">
+                Login będzie służył do logowania. Konto zostanie automatycznie utworzone w systemie.
+              </p>
+            )}
 
             {form.role !== 'salon' && (
               <>
@@ -249,7 +339,7 @@ const AdminEmployees = () => {
                         <Input
                           value={form.workingHours[key] || ''}
                           onChange={e => setWH(key, e.target.value)}
-                          placeholder="np. 6:00-22:00 lub wolne"
+                          placeholder="np. 9:00-17:00 lub wolne"
                           className="text-sm"
                         />
                       </div>
@@ -282,7 +372,7 @@ const AdminEmployees = () => {
                             ...f,
                             canViewCalendars: checked
                               ? [...f.canViewCalendars, emp.id]
-                              : f.canViewCalendars.filter(id => id !== emp.id)
+                              : f.canViewCalendars.filter(id => id !== emp.id),
                           }));
                         }}
                       />
@@ -293,8 +383,8 @@ const AdminEmployees = () => {
               </div>
             )}
 
-            <Button onClick={handleSave} className="w-full bg-primary text-primary-foreground">
-              {editing ? 'Zapisz' : 'Dodaj'}
+            <Button onClick={handleSave} disabled={saving} className="w-full bg-primary text-primary-foreground">
+              {saving ? <><Loader2 className="w-4 h-4 animate-spin mr-2" />Zapisuję...</> : (editing ? 'Zapisz' : 'Dodaj pracownika')}
             </Button>
           </div>
         </DialogContent>

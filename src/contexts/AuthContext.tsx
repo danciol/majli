@@ -9,13 +9,14 @@ import {
 } from 'firebase/auth';
 import { collection, query, where, getDocs } from 'firebase/firestore';
 import { auth, db } from '@/lib/firebase';
+import { loginToEmail } from '@/lib/auth';
 import type { Employee } from '@/data/services';
 
 interface AuthContextType {
   employee: Employee | null;
   isAuthenticated: boolean;
   loading: boolean;
-  login: (email: string, password: string, remember?: boolean) => Promise<boolean>;
+  login: (login: string, password: string, remember?: boolean) => Promise<boolean>;
   logout: () => void;
 }
 
@@ -41,7 +42,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             const docSnap = snap.docs[0];
             setEmployee({ ...docSnap.data(), id: docSnap.id } as Employee);
           } else {
-            // Firebase Auth user exists but no matching employee — sign out
             await signOut(auth);
             setEmployee(null);
           }
@@ -56,8 +56,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return unsubscribe;
   }, []);
 
-  const login = async (email: string, password: string, remember = false): Promise<boolean> => {
+  const login = async (loginVal: string, password: string, remember = false): Promise<boolean> => {
     try {
+      const email = loginToEmail(loginVal);
       await setPersistence(auth, remember ? browserLocalPersistence : browserSessionPersistence);
       await signInWithEmailAndPassword(auth, email, password);
       return true;

@@ -10,7 +10,7 @@ import { Loader2, Zap } from 'lucide-react';
 import { IS_DEMO, DEMO_CREDENTIALS } from '@/config/demo';
 
 const AdminLogin = () => {
-  const [email, setEmail] = useState(IS_DEMO ? DEMO_CREDENTIALS.email : '');
+  const [loginVal, setLoginVal] = useState(IS_DEMO ? DEMO_CREDENTIALS.email : '');
   const [password, setPassword] = useState(IS_DEMO ? DEMO_CREDENTIALS.password : '');
   const [remember, setRemember] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
@@ -21,12 +21,12 @@ const AdminLogin = () => {
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!email || !password) { toast.error('Wprowadź e-mail i hasło'); return; }
+    if (!loginVal || !password) { toast.error('Wprowadź login i hasło'); return; }
     setIsLoading(true);
-    const success = await doLogin(email, password, remember);
+    const success = await doLogin(loginVal, password, remember);
     setIsLoading(false);
     if (success) { toast.success('Zalogowano pomyślnie'); navigate('/admin'); }
-    else toast.error('Nieprawidłowy e-mail lub hasło');
+    else toast.error('Nieprawidłowy login lub hasło');
   };
 
   return (
@@ -45,21 +45,22 @@ const AdminLogin = () => {
             </div>
             <p className="text-xs text-amber-600 mb-3">Dane przykładowe, resetowane każdej nocy.</p>
             <div className="bg-white rounded-lg p-3 text-xs font-mono space-y-1 border border-amber-100">
-              <div><span className="text-muted-foreground">E-mail: </span><strong>{DEMO_CREDENTIALS.email}</strong></div>
+              <div><span className="text-muted-foreground">Login: </span><strong>{DEMO_CREDENTIALS.email}</strong></div>
               <div><span className="text-muted-foreground">Hasło: </span><strong>{DEMO_CREDENTIALS.password}</strong></div>
             </div>
           </div>
         )}
         <form onSubmit={handleLogin} className="space-y-4">
           <div>
-            <Label htmlFor="email">E-mail</Label>
+            <Label htmlFor="login">Login</Label>
             <Input
-              id="email"
-              type="email"
-              placeholder="twoj@email.pl"
-              value={email}
-              onChange={e => setEmail(e.target.value)}
-              autoComplete="email"
+              id="login"
+              type="text"
+              placeholder="Twój login"
+              value={loginVal}
+              onChange={e => setLoginVal(e.target.value)}
+              autoComplete="username"
+              autoCapitalize="none"
             />
           </div>
           <div>
@@ -92,7 +93,7 @@ const AdminLogin = () => {
             <a href="https://wizyto.pl#kontakt" className="text-primary font-semibold hover:underline">Kup Wizyto dla swojego salonu →</a>
           </p>
         ) : (
-          <p className="text-xs text-muted-foreground text-center mt-6">E-mail i hasło ustala administrator w zakładce Pracownicy</p>
+          <p className="text-xs text-muted-foreground text-center mt-6">Login i hasło ustala administrator w zakładce Pracownicy</p>
         )}
       </div>
     </div>
