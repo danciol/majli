@@ -460,6 +460,8 @@ const AdminDashboard = () => {
             {todayAppointments.map((appt) => {
               const service = services.find(s => s.id === appt.serviceId);
               const employee = employees.find(e => e.id === appt.employeeId);
+              const isUpdating = updatingId === appt.id;
+              const isDone = appt.status === 'completed' || appt.status === 'cancelled';
               return (
                 <div key={appt.id} className="flex items-center justify-between p-4 rounded-lg bg-secondary/50 hover:bg-secondary/80 transition-colors gap-3">
                   <div className="flex items-center gap-4 min-w-0">
@@ -474,9 +476,31 @@ const AdminDashboard = () => {
                       </p>
                     </div>
                   </div>
-                  <span className={`text-xs px-3 py-1 rounded-full font-medium shrink-0 ${statusColors[appt.status]}`}>
-                    {statusLabels[appt.status]}
-                  </span>
+                  <div className="flex items-center gap-1 shrink-0">
+                    <span className={`text-xs px-2.5 py-1 rounded-full font-medium ${statusColors[appt.status]}`}>
+                      {statusLabels[appt.status]}
+                    </span>
+                    {isUpdating ? (
+                      <Loader2 className="w-4 h-4 animate-spin text-primary ml-1" />
+                    ) : !isDone && (
+                      <>
+                        <Button
+                          variant="ghost" size="icon" className="h-8 w-8 text-green-600 hover:text-green-700 hover:bg-green-50"
+                          title="Oznacz jako zakończona"
+                          onClick={() => handleStatus(appt.id, 'completed')}
+                        >
+                          <CheckCircle className="w-4 h-4" />
+                        </Button>
+                        <Button
+                          variant="ghost" size="icon" className="h-8 w-8 text-destructive hover:text-destructive hover:bg-destructive/10"
+                          title="Anuluj wizytę"
+                          onClick={() => handleStatus(appt.id, 'cancelled')}
+                        >
+                          <X className="w-4 h-4" />
+                        </Button>
+                      </>
+                    )}
+                  </div>
                 </div>
               );
             })}
