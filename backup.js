@@ -41,7 +41,9 @@ async function exportCollection(collectionName) {
 async function runBackup() {
   const date = new Date().toISOString().split('T')[0];
   const outputFile = `backup-${date}.json`;
-  const outputPath = path.join(__dirname, outputFile);
+  const backupDir = path.join(__dirname, 'backups');
+  if (!fs.existsSync(backupDir)) fs.mkdirSync(backupDir);
+  const outputPath = path.join(backupDir, outputFile);
 
   console.log(`Eksport bazy danych: ${PROJECT_ID}`);
   console.log(`Data: ${date}`);

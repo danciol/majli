@@ -27,4 +27,4 @@ dist-ssr
 
 # Backup i klucze
 serviceAccountKey.json
-backup-*.json
+backups/
