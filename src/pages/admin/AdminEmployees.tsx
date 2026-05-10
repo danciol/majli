@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import type { Employee } from '@/data/services';
 import { useEmployees } from '@/hooks/useFirestore';
-import { Plus, Edit2, Trash2, User, Loader2 } from 'lucide-react';
+import { Edit2, Trash2, User, Loader2 } from 'lucide-react';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -16,7 +16,6 @@ import { toast } from 'sonner';
 import { initializeApp, deleteApp } from 'firebase/app';
 import {
   getAuth,
-  createUserWithEmailAndPassword,
   signInWithEmailAndPassword as fbSignIn,
   updatePassword,
   deleteUser,
@@ -44,7 +43,6 @@ const dayLabelsShort: Record<string, string> = {
 
 interface EmployeeForm {
   name: string;
-  login: string;
   password: string;
   role: string;
   workingHours: Record<string, string>;
@@ -52,18 +50,6 @@ interface EmployeeForm {
   canViewCalendars: string[];
 }
 
-const defaultWorkingHours: Record<string, string> = {
-  monday: '9:00-17:00',
-  tuesday: '9:00-17:00',
-  wednesday: '9:00-17:00',
-  thursday: '9:00-17:00',
-  friday: '9:00-17:00',
-  saturday: 'wolne',
-  sunday: 'wolne',
-};
-
-// Use a secondary Firebase app to create/update/delete auth accounts
-// without affecting the currently logged-in admin session.
 async function withSecondaryAuth<T>(fn: (secondaryAuth: ReturnType<typeof getAuth>) => Promise<T>): Promise<T> {
   const appName = `emp-op-${Date.now()}`;
   const secondaryApp = initializeApp(salonConfig.firebase, appName);
@@ -77,23 +63,14 @@ async function withSecondaryAuth<T>(fn: (secondaryAuth: ReturnType<typeof getAut
 }
 
 const AdminEmployees = () => {
-  const { employees, loading, addEmployee, updateEmployee, deleteEmployee } = useEmployees();
+  const { employees, loading, updateEmployee, deleteEmployee } = useEmployees();
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editing, setEditing] = useState<Employee | null>(null);
   const [saving, setSaving] = useState(false);
   const [form, setForm] = useState<EmployeeForm>({
-    name: '', login: '', password: '', role: 'pracownik',
-    workingHours: { ...defaultWorkingHours }, daysOff: '', canViewCalendars: [],
+    name: '', password: '', role: 'pracownik',
+    workingHours: {}, daysOff: '', canViewCalendars: [],
   });
-
-  const openNew = () => {
-    setEditing(null);
-    setForm({
-      name: '', login: '', password: '', role: 'pracownik',
-      workingHours: { ...defaultWorkingHours }, daysOff: '', canViewCalendars: [],
-    });
-    setDialogOpen(true);
-  };
 
   const openEdit = (e: Employee) => {
     setEditing(e);
@@ -103,7 +80,6 @@ const AdminEmployees = () => {
     }
     setForm({
       name: e.name,
-      login: e.login || '',
       password: '',
       role: e.role || 'pracownik',
       workingHours: wh,
@@ -118,73 +94,40 @@ const AdminEmployees = () => {
   };
 
   const handleSave = async () => {
+    if (!editing) return;
     if (!form.name.trim()) { toast.error('Wprowadź imię'); return; }
-    if (!editing) {
-      if (!form.login.trim()) { toast.error('Wprowadź login'); return; }
-      if (!form.password.trim()) { toast.error('Wprowadź hasło'); return; }
-      if (form.password.length < 6) { toast.error('Hasło musi mieć minimum 6 znaków'); return; }
-    }
 
     setSaving(true);
     try {
       const daysOff = form.daysOff.split(',').map(s => s.trim()).filter(Boolean);
+      const data: Partial<Employee> = {
+        name: form.name,
+        role: form.role as Employee['role'],
+        workingHours: form.workingHours,
+        daysOff,
+        canViewCalendars: form.canViewCalendars,
+      };
 
-      if (editing) {
-        // Update Firestore data
-        const data: Partial<Employee> = {
-          name: form.name,
-          role: form.role as Employee['role'],
-          workingHours: form.workingHours,
-          daysOff,
-          canViewCalendars: form.canViewCalendars,
-        };
-
-        // If new password provided, update Firebase Auth
-        if (form.password.trim()) {
-          if (form.password.length < 6) { toast.error('Hasło musi mieć minimum 6 znaków'); setSaving(false); return; }
-          const empLogin = editing.login || '';
-          const empEmail = editing.email || loginToEmail(empLogin);
-          const storedPassword = editing.password || '';
-
-          try {
-            await withSecondaryAuth(async (secondaryAuth) => {
-              const cred = await fbSignIn(secondaryAuth, empEmail, storedPassword);
-              await updatePassword(cred.user, form.password);
-            });
-            data.password = form.password;
-          } catch {
-            toast.warning('Dane zaktualizowane, ale zmiana hasła nie powiodła się — stare hasło mogło być inne');
-          }
+      if (form.password.trim()) {
+        if (form.password.length < 6) { toast.error('Hasło musi mieć minimum 6 znaków'); setSaving(false); return; }
+        const empEmail = editing.email || loginToEmail(editing.login || '');
+        const storedPassword = editing.password || '';
+        try {
+          await withSecondaryAuth(async (secondaryAuth) => {
+            const cred = await fbSignIn(secondaryAuth, empEmail, storedPassword);
+            await updatePassword(cred.user, form.password);
+          });
+          data.password = form.password;
+        } catch {
+          toast.warning('Dane zaktualizowane, ale zmiana hasła nie powiodła się — stare hasło mogło być inne');
         }
-
-        await updateEmployee(editing.id, data);
-        toast.success('Pracownik zaktualizowany');
-      } else {
-        // New employee — create Firebase Auth account
-        const email = loginToEmail(form.login);
-        await withSecondaryAuth(async (secondaryAuth) => {
-          await createUserWithEmailAndPassword(secondaryAuth, email, form.password);
-        });
-
-        await addEmployee({
-          name: form.name,
-          email,
-          login: form.login.toLowerCase().trim(),
-          password: form.password,
-          role: form.role,
-          workingHours: form.workingHours,
-          daysOff,
-          canViewCalendars: [],
-        });
-        toast.success('Pracownik dodany');
       }
 
+      await updateEmployee(editing.id, data);
+      toast.success('Pracownik zaktualizowany');
       setDialogOpen(false);
-    } catch (e: any) {
-      if (e?.code === 'auth/email-already-in-use') toast.error('Login jest już zajęty');
-      else if (e?.code === 'auth/weak-password') toast.error('Hasło musi mieć minimum 6 znaków');
-      else if (e?.code === 'auth/invalid-credential') toast.error('Błąd autoryzacji — sprawdź dane pracownika');
-      else toast.error('Błąd zapisu');
+    } catch {
+      toast.error('Błąd zapisu');
     } finally {
       setSaving(false);
     }
@@ -193,15 +136,12 @@ const AdminEmployees = () => {
   const handleDelete = async (id: string) => {
     const emp = employees.find(e => e.id === id);
     try {
-      // Try to delete Firebase Auth account
       if (emp?.login && emp?.password) {
         const empEmail = emp.email || loginToEmail(emp.login);
         await withSecondaryAuth(async (secondaryAuth) => {
           const cred = await fbSignIn(secondaryAuth, empEmail, emp.password!);
           await deleteUser(cred.user);
-        }).catch(() => {
-          // If Firebase Auth deletion fails, continue — Firestore record will be removed
-        });
+        }).catch(() => {});
       }
       await deleteEmployee(id);
       toast.success('Pracownik usunięty');
@@ -214,11 +154,9 @@ const AdminEmployees = () => {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div>
         <h1 className="font-heading text-2xl font-bold">Pracownicy</h1>
-        <Button onClick={openNew} className="bg-primary text-primary-foreground">
-          <Plus className="w-4 h-4 mr-2" /> Dodaj pracownika
-        </Button>
+        <p className="text-sm text-muted-foreground mt-1">Nowych pracowników dodaje superadmin przez Firebase</p>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
@@ -270,13 +208,13 @@ const AdminEmployees = () => {
       </div>
 
       {employees.length === 0 && (
-        <p className="text-center text-muted-foreground py-12">Brak pracowników. Dodaj pierwszego pracownika.</p>
+        <p className="text-center text-muted-foreground py-12">Brak pracowników.</p>
       )}
 
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
         <DialogContent className="max-h-[85vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle className="font-heading">{editing ? 'Edytuj pracownika' : 'Dodaj pracownika'}</DialogTitle>
+            <DialogTitle className="font-heading">Edytuj pracownika</DialogTitle>
           </DialogHeader>
           <div className="space-y-4 pt-2">
             <div>
@@ -298,35 +236,20 @@ const AdminEmployees = () => {
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <Label>Login</Label>
-                {editing ? (
-                  <div className="flex items-center h-10 px-3 rounded-md border border-border bg-secondary/50 text-sm font-mono text-muted-foreground">
-                    {editing.login || '—'}
-                  </div>
-                ) : (
-                  <Input
-                    value={form.login}
-                    onChange={e => setForm(f => ({ ...f, login: e.target.value.toLowerCase().replace(/\s/g, '') }))}
-                    placeholder="np. anna"
-                    autoCapitalize="none"
-                  />
-                )}
+                <div className="flex items-center h-10 px-3 rounded-md border border-border bg-secondary/50 text-sm font-mono text-muted-foreground">
+                  {editing?.login || '—'}
+                </div>
               </div>
               <div>
-                <Label>{editing ? 'Nowe hasło (opcjonalne)' : 'Hasło'}</Label>
+                <Label>Nowe hasło <span className="text-muted-foreground font-normal">(opcjonalne)</span></Label>
                 <Input
                   type="password"
                   value={form.password}
                   onChange={e => setForm(f => ({ ...f, password: e.target.value }))}
-                  placeholder={editing ? 'Zostaw puste — bez zmian' : 'Min. 6 znaków'}
+                  placeholder="Zostaw puste — bez zmian"
                 />
               </div>
             </div>
-
-            {!editing && (
-              <p className="text-xs text-muted-foreground -mt-2">
-                Login będzie służył do logowania. Konto zostanie automatycznie utworzone w systemie.
-              </p>
-            )}
 
             {form.role !== 'salon' && (
               <>
@@ -384,7 +307,7 @@ const AdminEmployees = () => {
             )}
 
             <Button onClick={handleSave} disabled={saving} className="w-full bg-primary text-primary-foreground">
-              {saving ? <><Loader2 className="w-4 h-4 animate-spin mr-2" />Zapisuję...</> : (editing ? 'Zapisz' : 'Dodaj pracownika')}
+              {saving ? <><Loader2 className="w-4 h-4 animate-spin mr-2" />Zapisuję...</> : 'Zapisz'}
             </Button>
           </div>
         </DialogContent>
