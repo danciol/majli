@@ -43,6 +43,7 @@ const dayLabelsShort: Record<string, string> = {
 
 interface EmployeeForm {
   name: string;
+  phone: string;
   password: string;
   role: string;
   workingHours: Record<string, string>;
@@ -68,7 +69,7 @@ const AdminEmployees = () => {
   const [editing, setEditing] = useState<Employee | null>(null);
   const [saving, setSaving] = useState(false);
   const [form, setForm] = useState<EmployeeForm>({
-    name: '', password: '', role: 'pracownik',
+    name: '', phone: '', password: '', role: 'pracownik',
     workingHours: {}, daysOff: '', canViewCalendars: [],
   });
 
@@ -80,6 +81,7 @@ const AdminEmployees = () => {
     }
     setForm({
       name: e.name,
+      phone: e.phone || '',
       password: '',
       role: e.role || 'pracownik',
       workingHours: wh,
@@ -102,6 +104,7 @@ const AdminEmployees = () => {
       const daysOff = form.daysOff.split(',').map(s => s.trim()).filter(Boolean);
       const data: Partial<Employee> = {
         name: form.name,
+        phone: form.phone.trim() || undefined,
         role: form.role as Employee['role'],
         workingHours: form.workingHours,
         daysOff,
@@ -246,6 +249,14 @@ const AdminEmployees = () => {
                   placeholder="Zostaw puste — bez zmian"
                 />
               </div>
+            </div>
+            <div>
+              <Label>Telefon pracownika <span className="text-muted-foreground font-normal">(do powiadomień SMS)</span></Label>
+              <Input
+                value={form.phone}
+                onChange={e => setForm(f => ({ ...f, phone: e.target.value }))}
+                placeholder="+48 600 100 200"
+              />
             </div>
 
             {form.role !== 'salon' && (

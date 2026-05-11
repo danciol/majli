@@ -4,8 +4,10 @@ import { pl } from 'date-fns/locale';
 import { ChevronLeft, ChevronRight, Plus, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Appointment } from '@/data/services';
-import { useAppointments, useServices, useEmployees, useClients } from '@/hooks/useFirestore';
+import { useAppointments, useServices, useEmployees, useClients, useTimeBlocks } from '@/hooks/useFirestore';
+import type { TimeBlock } from '@/hooks/useFirestore';
 import { useAuth } from '@/contexts/AuthContext';
+import { usePlan } from '@/hooks/usePlan';
 import { toast } from 'sonner';
 import AppointmentDialog, { formatPhoneNumber } from '@/components/admin/AppointmentDialog';
 import { NativeSelect } from '@/components/ui/native-select';
@@ -92,7 +94,9 @@ const AdminCalendar = () => {
   const { services, loading: loadingS } = useServices();
   const { employees, loading: loadingE } = useEmployees();
   const { clients, addClient, updateClient } = useClients();
+  const { timeBlocks } = useTimeBlocks();
   const { employee: currentUser } = useAuth();
+  const { can } = usePlan();
   const [apptDialogOpen, setApptDialogOpen] = useState(false);
   const [editingAppointment, setEditingAppointment] = useState<Appointment | null>(null);
   const [newApptDate, setNewApptDate] = useState<Date | null>(null);
@@ -194,9 +198,23 @@ const AdminCalendar = () => {
       >
         <p className="font-bold truncate leading-tight">{a.clientName}</p>
         {h > 28 && <p className="truncate opacity-75 leading-tight">{format(aDate, 'HH:mm')} · {service?.name || 'Wizyta'}</p>}
-        {h > 48 && a.clientPhone && <p className="truncate opacity-65 leading-tight">📞 {formatPhoneNumber(a.clientPhone)}</p>}
+        {h > 48 && a.clientPhone && !(can('phone_protection') && !isAdmin) && <p className="truncate opacity-65 leading-tight">📞 {formatPhoneNumber(a.clientPhone)}</p>}
         {h > 64 && a.notes && <p className="truncate opacity-60 leading-tight italic">📝 {a.notes}</p>}
         {h > 80 && employee && viewMode === 'week' && <p className="truncate opacity-50 leading-tight">{employee.name}</p>}
+      </div>
+    );
+  };
+
+  const TimeBlockCard = ({ block, topPx, heightPx }: { block: TimeBlock; topPx: number; heightPx: number }) => {
+    const h = Math.max(heightPx, 20);
+    return (
+      <div
+        className="absolute z-[8] rounded-md px-2 py-1 text-xs bg-secondary/80 border border-border/60 pointer-events-none"
+        style={{ top: `${topPx}px`, height: `${h}px`, left: '1px', right: '1px' }}
+      >
+        {h > 24 && (
+          <p className="truncate text-muted-foreground font-medium">{block.note || 'Zablokowany termin'}</p>
+        )}
       </div>
     );
   };
@@ -209,6 +227,10 @@ const AdminCalendar = () => {
     // Show day-off overlay when a specific employee is known for this column
     const effectiveEmpId = empId || (filterEmployeeId !== 'all' ? filterEmployeeId : null);
     const isOff = effectiveEmpId ? isDayOff(day, effectiveEmpId) : false;
+
+    const dayBlocks = can('time_blocks')
+      ? timeBlocks.filter(b => b.date === dayStr && (!effectiveEmpId || b.employeeId === effectiveEmpId))
+      : [];
 
     return (
       <div className="border-l border-border/40 relative">
@@ -234,6 +256,14 @@ const AdminCalendar = () => {
             )}
           </div>
         ))}
+        {dayBlocks.map(block => {
+          const [sh, sm] = block.startTime.split(':').map(Number);
+          const [eh, em] = block.endTime.split(':').map(Number);
+          const topPx = (sh + sm / 60 - START_HOUR) * HOUR_HEIGHT;
+          const heightPx = (eh + em / 60 - sh - sm / 60) * HOUR_HEIGHT;
+          if (topPx < 0) return null;
+          return <TimeBlockCard key={block.id} block={block} topPx={topPx} heightPx={heightPx} />;
+        })}
         {appts.map(a => {
           const aDate = new Date(a.date);
           const startHour = aDate.getHours() + aDate.getMinutes() / 60;
@@ -365,6 +395,7 @@ const AdminCalendar = () => {
         employees={employees}
         onSave={handleSaveAppointment}
         onDelete={handleDeleteAppointment}
+        hidePhone={can('phone_protection') && !isAdmin}
       />
 
     </div>

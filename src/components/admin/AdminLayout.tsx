@@ -1,7 +1,7 @@
 import { Outlet, Link, useLocation, useNavigate, Navigate } from 'react-router-dom';
 import {
   LayoutDashboard, Calendar, Scissors, Users, ClipboardList,
-  LogOut, Menu, X, UserCheck, MessageSquare, Settings, Images, TrendingUp, Clock, CalendarOff,
+  LogOut, Menu, X, UserCheck, MessageSquare, Settings, Images, TrendingUp, Clock, CalendarOff, Ban,
 } from 'lucide-react';
 import { useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
@@ -29,6 +29,7 @@ const allLinks: NavLink[] = [
   { to: '/admin/oczekujacy',   label: 'Oczekujący',  icon: Clock,           roles: ['admin'],             feature: 'online_booking' },
   { to: '/admin/galeria',      label: 'Galeria',     icon: Images,          roles: ['admin'],             feature: 'gallery' },
   { to: '/admin/raporty',      label: 'Raporty',     icon: TrendingUp,      roles: ['admin'],             feature: 'reports' },
+  { to: '/admin/blokady',      label: 'Blokady',     icon: Ban,             roles: ['admin'],             feature: 'time_blocks' },
   { to: '/admin/ustawienia',   label: 'Ustawienia',  icon: Settings,        roles: ['admin'] },
 ];
 

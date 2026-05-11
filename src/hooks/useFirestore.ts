@@ -186,6 +186,30 @@ export function useSettings() {
   return { depositAmount, textBeeApiKey, textBeeDeviceId, reminderTemplate, cloudinaryCloudName, cloudinaryUploadPreset, googleReviewsUrl, loading, saveDepositAmount, saveTextBee, saveReminderTemplate, saveCloudinary, saveGoogleReviews };
 }
 
+// --- Time Blocks ---
+export interface TimeBlock {
+  id: string;
+  employeeId: string;
+  date: string;      // yyyy-MM-dd
+  startTime: string; // HH:mm
+  endTime: string;   // HH:mm
+  note?: string;
+}
+
+export function useTimeBlocks() {
+  const { data, loading } = useCollection<TimeBlock>('time_blocks', orderBy('date', 'asc'));
+
+  const addTimeBlock = async (block: Omit<TimeBlock, 'id'>) => {
+    await addDoc(collection(db, 'time_blocks'), block);
+  };
+
+  const deleteTimeBlock = async (id: string) => {
+    await deleteDoc(doc(db, 'time_blocks', id));
+  };
+
+  return { timeBlocks: data, loading, addTimeBlock, deleteTimeBlock };
+}
+
 // --- Waiting List ---
 export interface WaitingListEntry {
   id: string;
