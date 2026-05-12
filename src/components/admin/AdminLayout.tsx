@@ -5,6 +5,7 @@ import {
 } from 'lucide-react';
 import { useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
+import { PwaInstallBanner } from './PwaInstallBanner';
 import { useAppointments, useWaitingList } from '@/hooks/useFirestore';
 import { usePlan } from '@/hooks/usePlan';
 import type { FeatureKey } from '@/config/plans';
@@ -121,6 +122,7 @@ export function AdminLayout() {
         </header>
         <main className="flex-1 p-4 md:p-6 overflow-auto"><Outlet /></main>
       </div>
+      <PwaInstallBanner />
     </div>
   );
 }
