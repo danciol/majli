@@ -104,7 +104,8 @@ const AdminCalendar = () => {
 
 
   const isAdmin = currentUser?.role === 'admin';
-  const visibleEmployees = (isAdmin
+  const isSalon = currentUser?.role === 'salon';
+  const visibleEmployees = (isAdmin || isSalon
     ? employees
     : employees.filter(e => e.id === currentUser?.id || (currentUser?.canViewCalendars || []).includes(e.id))
   ).filter(e => (e.role || 'pracownik') !== 'salon');
